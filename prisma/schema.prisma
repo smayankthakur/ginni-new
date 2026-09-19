@@ -1,0 +1,50 @@
+// This app needs a real Postgres database to work. Any Postgres host works
+// (Neon, Vercel Postgres, Supabase, Railway, etc.) — see .env.local.example
+// and the README for exactly which connection string goes where.
+//
+// After setting DATABASE_URL and DIRECT_URL, run:
+//   npx prisma migrate dev --name init
+// which creates these tables for you.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  passwordHash        String
+  name                String?
+  readingsUsed        Int       @default(0)
+  subscriptionExpires DateTime?
+  createdAt           DateTime  @default(now())
+  orders              Order[]
+}
+
+model Order {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  razorpayOrderId String   @unique
+  amount          Int
+  status          String   @default("created") // created -> paid
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Footer "Get Daily Divine Insights" signups (email + optional WhatsApp number).
+model NewsletterSubscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  phone     String?
+  source    String   @default("footer")
+  createdAt DateTime @default(now())
+}
