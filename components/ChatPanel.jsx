@@ -5,7 +5,7 @@ import { DECK, TOPICS } from "@/lib/topics";
 import { shuffle } from "@/lib/parseReading";
 import { getGreeting, getClosing } from "@/lib/ginni";
 import { classifyQuestion } from "@/lib/classify";
-import TarotCard from "./TarotCard";
+import DrawOverlay from "./DrawOverlay";
 import RevealCard from "./RevealCard";
 import Paywall from "./Paywall";
 
@@ -36,10 +36,10 @@ const NETWORK_ERROR = {
   hindi: "सर्वर तक नहीं पहुँच पाई — कनेक्शन चेक करके फिर कोशिश कीजिए।",
 };
 
-const DRAW_HINT = {
-  hinglish: "78 cards, taaza shuffled — jo aapko bulaaye, wahi chuniye.",
-  english: "78 cards, freshly shuffled — tap the one that calls to you.",
-  hindi: "78 कार्ड्स, ताज़ा शफ़ल्ड — जो आपको बुलाए, वही चुनिए।",
+const CANCELLED_NOTE = {
+  hinglish: "Koi baat nahi — jab chaho phir se poochh lena. 💜",
+  english: "No worries — ask again whenever you're ready. 💜",
+  hindi: "कोई बात नहीं — जब चाहें फिर से पूछ लीजिए। 💜",
 };
 
 let idCounter = 0;
@@ -61,41 +61,40 @@ export default function ChatPanel({
     { id: nextId(), role: "ginni", kind: "text", text: INTRO[lang]?.(name) || INTRO.hinglish(name) },
   ]);
   const [input, setInput] = useState("");
+  // The card-draw ritual happens full-screen (see DrawOverlay), not inline
+  // in the thread — matches chat.thedivinetarotonline.com's own pattern,
+  // which is also the only way 78 cards comfortably fit on a phone screen.
+  const [activeDraw, setActiveDraw] = useState(null); // {id, topicId, spread, flippingCard}
   const [busy, setBusy] = useState(false);
-  const [pendingDrawId, setPendingDrawId] = useState(null);
   const [showPaywall, setShowPaywall] = useState(false);
   const endRef = useRef(null);
 
-  // Refs mirror the gating state so handleSend/handlePick always read the
-  // latest value, even when called from the pendingAsk effect below.
   const busyRef = useRef(false);
-  const pendingDrawRef = useRef(null);
+  const activeDrawRef = useRef(null);
   useEffect(() => { busyRef.current = busy; }, [busy]);
-  useEffect(() => { pendingDrawRef.current = pendingDrawId; }, [pendingDrawId]);
+  useEffect(() => { activeDrawRef.current = activeDraw; }, [activeDraw]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, pendingDrawId]);
+  }, [messages]);
 
   function handleSend(rawText) {
     const text = (rawText || "").trim();
-    if (!text || busyRef.current || pendingDrawRef.current) return;
+    if (!text || busyRef.current || activeDrawRef.current) return;
 
     const topicId = classifyQuestion(text);
     const topic = TOPICS.find((t) => t.id === topicId) || TOPICS[6];
     onTopicResolved?.(topicId);
 
-    const drawId = nextId();
     const seed = Math.floor(Math.random() * 3);
 
     setMessages((m) => [
       ...m,
       { id: nextId(), role: "user", text },
       { id: nextId(), role: "ginni", kind: "text", text: getGreeting(name, lang, topic, seed) },
-      { id: drawId, role: "ginni", kind: "draw", topicId, spread: shuffle(DECK), flippingCard: null },
     ]);
     setInput("");
-    setPendingDrawId(drawId);
+    setActiveDraw({ id: nextId(), topicId, spread: shuffle(DECK), flippingCard: null });
   }
 
   // A question clicked in the left-hand list arrives here as plain text and
@@ -109,42 +108,43 @@ export default function ChatPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingAsk]);
 
-  async function handlePick(drawId, topicId, cardName) {
-    if (busyRef.current) return;
+  function handleCancelDraw() {
+    if (busyRef.current) return; // a card is already being charged/fetched — too late to cancel
+    setActiveDraw(null);
+    setMessages((m) => [...m, { id: nextId(), role: "ginni", kind: "text", text: CANCELLED_NOTE[lang] || CANCELLED_NOTE.hinglish }]);
+  }
+
+  async function handlePick(cardName) {
+    const draw = activeDrawRef.current;
+    if (!draw || busyRef.current) return;
     setBusy(true);
-    setMessages((m) => m.map((msg) => (msg.id === drawId ? { ...msg, flippingCard: cardName } : msg)));
+    setActiveDraw((d) => (d ? { ...d, flippingCard: cardName } : d));
 
     let res, data;
     try {
       res = await fetch("/api/reading/pick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topicId, card: cardName }),
+        body: JSON.stringify({ topicId: draw.topicId, card: cardName }),
       });
       data = await res.json();
     } catch {
-      setMessages((m) =>
-        m.map((msg) => (msg.id === drawId ? { id: drawId, role: "ginni", kind: "text", text: NETWORK_ERROR[lang] || NETWORK_ERROR.hinglish } : msg))
-      );
+      setActiveDraw(null);
+      setMessages((m) => [...m, { id: nextId(), role: "ginni", kind: "text", text: NETWORK_ERROR[lang] || NETWORK_ERROR.hinglish }]);
       setBusy(false);
-      setPendingDrawId(null);
       return;
     }
 
     if (!res.ok) {
+      setActiveDraw(null);
       if (data.error === "limit_reached") {
         onAccessChange?.(data);
-        setMessages((m) =>
-          m.map((msg) => (msg.id === drawId ? { id: drawId, role: "ginni", kind: "text", text: LIMIT_MESSAGE[lang]?.(name) || LIMIT_MESSAGE.hinglish(name) } : msg))
-        );
+        setMessages((m) => [...m, { id: nextId(), role: "ginni", kind: "text", text: LIMIT_MESSAGE[lang]?.(name) || LIMIT_MESSAGE.hinglish(name) }]);
         setTimeout(() => setShowPaywall(true), 700);
       } else {
-        setMessages((m) =>
-          m.map((msg) => (msg.id === drawId ? { id: drawId, role: "ginni", kind: "text", text: data.error || GENERIC_ERROR[lang] || GENERIC_ERROR.hinglish } : msg))
-        );
+        setMessages((m) => [...m, { id: nextId(), role: "ginni", kind: "text", text: data.error || GENERIC_ERROR[lang] || GENERIC_ERROR.hinglish }]);
       }
       setBusy(false);
-      setPendingDrawId(null);
       return;
     }
 
@@ -152,28 +152,24 @@ export default function ChatPanel({
     const pickToken = data.pickToken;
 
     setTimeout(() => {
-      setMessages((m) => {
-        const replaced = m.map((msg) =>
-          msg.id === drawId ? { id: drawId, role: "ginni", kind: "reveal", card: cardName, pickToken } : msg
-        );
-        return [
-          ...replaced,
-          { id: nextId(), role: "ginni", kind: "text", text: getClosing(name, lang, Math.floor(Math.random() * 3)) },
-        ];
-      });
-      setPendingDrawId(null);
+      setMessages((m) => [
+        ...m,
+        { id: nextId(), role: "ginni", kind: "reveal", card: cardName, pickToken },
+        { id: nextId(), role: "ginni", kind: "text", text: getClosing(name, lang, Math.floor(Math.random() * 3)) },
+      ]);
+      setActiveDraw(null);
       setBusy(false);
-    }, 620); // matches the existing card-flip timing in ReadingPanel.jsx
+    }, 620); // matches the existing card-flip timing from the original ReadingPanel.jsx
   }
 
-  const composerDisabled = busy || !!pendingDrawId;
+  const composerDisabled = busy || !!activeDraw;
   const freeLeft = access?.freeLeft ?? 0;
 
   return (
     <div className="chat-shell">
       <div className="chat-thread">
         {messages.map((msg) => (
-          <ChatBubble key={msg.id} msg={msg} lang={lang} onPick={handlePick} />
+          <ChatBubble key={msg.id} msg={msg} lang={lang} />
         ))}
         <div ref={endRef} />
       </div>
@@ -206,6 +202,16 @@ export default function ChatPanel({
         </form>
       </div>
 
+      <DrawOverlay
+        key={activeDraw?.id ?? "none"}
+        open={!!activeDraw}
+        lang={lang}
+        spread={activeDraw?.spread || []}
+        flippingCard={activeDraw?.flippingCard}
+        onPick={handlePick}
+        onCancel={handleCancelDraw}
+      />
+
       {showPaywall && (
         <div className="chat-modal-backdrop" onClick={() => setShowPaywall(false)}>
           <div className="chat-modal-panel" onClick={(e) => e.stopPropagation()}>
@@ -226,7 +232,7 @@ export default function ChatPanel({
   );
 }
 
-function ChatBubble({ msg, lang, onPick }) {
+function ChatBubble({ msg, lang }) {
   if (msg.role === "user") {
     return (
       <div className="chat-row user">
@@ -240,28 +246,6 @@ function ChatBubble({ msg, lang, onPick }) {
       <div className="chat-row ginni">
         <div className="chat-bubble ginni chat-bubble--reveal">
           <RevealCard pick={{ card: msg.card, monthIndex: 1 }} pickToken={msg.pickToken} lang={lang} monthLabel={null} />
-        </div>
-      </div>
-    );
-  }
-
-  if (msg.kind === "draw") {
-    return (
-      <div className="chat-row ginni">
-        <div className="chat-bubble ginni chat-bubble--draw">
-          <div className="spread">
-            {msg.spread.map((c, i) => (
-              <TarotCard
-                key={c}
-                cardName={c}
-                flipped={c === msg.flippingCard}
-                disabledOther={!!msg.flippingCard && c !== msg.flippingCard}
-                onPick={(cardName) => onPick(msg.id, msg.topicId, cardName)}
-                style={{ animationDelay: `${Math.min(i * 6, 400)}ms` }}
-              />
-            ))}
-          </div>
-          <p className="spread-hint">{DRAW_HINT[lang] || DRAW_HINT.hinglish}</p>
         </div>
       </div>
     );
