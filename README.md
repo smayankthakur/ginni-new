@@ -37,6 +37,11 @@ variables (e.g. Vercel project settings) — `.env.local` is gitignored and
 never gets deployed automatically. Run `npx prisma migrate deploy` against
 your production database before the first deploy.
 
+Optional: `ANTHROPIC_API_KEY` — only needed for the AI fallback reading
+(see "AI fallback for unmatched/non-Hinglish questions" below). The app
+runs fine without it; that one feature just quietly falls back to a "try
+again" message if the key is missing.
+
 ## Accounts & server-side enforcement
 
 Every visitor now needs an account (email + password) before they can do
@@ -183,6 +188,50 @@ it splits them by detecting Devanagari vs. Latin script rather than relying
 on wording. As of the last content pass, every card in every one of the 15
 questions resolves to real text in all three languages — verified by running
 the parser against every file, not by inspection.
+
+## AI fallback for unmatched/non-Hinglish questions
+
+`lib/classify.js`'s free keyword matcher is the first and only pass for
+anything typed in Hinglish/English/Hindi that maps cleanly to one of the 15
+topics — no AI, no cost, unchanged from before. It only hands off to
+`lib/ai.js` (an Anthropic API call) in two cases:
+
+- The question doesn't match any of the 15 topics' keyword rules, or
+- `classify.js`'s `looksNonLatinScript()` flags the text as mostly outside
+  the Latin-alphabet range (Devanagari, Tamil, Arabic, Cyrillic, etc.) —
+  since the keyword rules can only ever recognise Latin-script phrasing.
+
+When that happens, the card is still drawn exactly as normal (same ritual,
+same credit charge), but `/api/reading/pick` sends the pick token through
+with the sentinel `topicId: "ai"` plus the raw question text instead of a
+real topic id. At reveal time, `/api/reveal` calls
+`composeAIReading({ card, question })`, which sends Claude the drawn card,
+the seeker's exact question, and *all 13 of this app's own existing
+readings for that card* (one per underlying data file), and asks it to:
+
+1. work out what language the question is written in,
+2. translate whichever listed reading actually answers it into that
+   language if one clearly does (staying faithful to the original —
+   nothing invented), or
+3. only if none of them fit, write an original reading itself, grounded in
+   the card's meaning, in Ginni's voice, in the seeker's own language.
+
+This is one Anthropic API call (not two), and it's the only thing in the
+app that touches `ANTHROPIC_API_KEY`. Language-toggling the sidebar after
+an AI-generated reading is deliberately a no-op (see `RevealCard.jsx`'s
+`aiMode` prop) — re-running the AI on every toggle click would just spend
+another call to produce a near-identical result, since the reading already
+matches the language the question was actually asked in.
+
+If the key is missing, or the API call fails for any reason,
+`composeAIReading()` returns `null` and the reveal shows the same
+"couldn't load this reading" fallback any other reveal failure would.
+
+Known limitation: there's no caching yet, so re-opening `/api/reveal` for
+the same AI-mode token (a page refresh mid-reading, for instance) calls the
+API again rather than replaying the first result. Worth adding if that
+turns out to matter in practice — it'd need a small table or KV store
+keyed by the pick token.
 
 ## Spread & draw behaviour
 

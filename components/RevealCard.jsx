@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { cardSlug, cardEmoji, UNAVAILABLE_MESSAGE } from "@/lib/topics";
 
 const SINGLE_LANG_NOTE = {
@@ -9,19 +9,33 @@ const SINGLE_LANG_NOTE = {
   hindi: "यह रीडिंग अभी सिर्फ हिंग्लिश में लिखी गई है — हिंदी वर्शन जल्द आएगा।",
 };
 
-export default function RevealCard({ pick, pickToken, lang, monthLabel }) {
+export default function RevealCard({ pick, pickToken, lang, monthLabel, aiMode }) {
   const [imgFailed, setImgFailed] = useState(false);
   const [state, setState] = useState({ loading: true, text: null, available: false, singleLanguageSource: false });
   const src = `/cards/${cardSlug(pick.card)}.png`;
+  // AI-generated readings already match the seeker's own question language
+  // — that's the actual point of them — so a later lang-toggle click
+  // shouldn't re-run the AI just to produce a near-identical result at
+  // another cost. This remembers which token we've already fetched for and
+  // skips re-fetching in that one case; every normal (non-AI) reveal still
+  // re-fetches on every lang change exactly as before.
+  const fetchedForRef = useRef(null);
 
   useEffect(() => {
+    if (aiMode && fetchedForRef.current === pickToken) return;
+
     let cancelled = false;
     setState((s) => ({ ...s, loading: true }));
 
-    fetch(`/api/reveal?token=${encodeURIComponent(pickToken)}&lang=${encodeURIComponent(lang)}`)
+    const url = aiMode
+      ? `/api/reveal?token=${encodeURIComponent(pickToken)}`
+      : `/api/reveal?token=${encodeURIComponent(pickToken)}&lang=${encodeURIComponent(lang)}`;
+
+    fetch(url)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
+        fetchedForRef.current = pickToken;
         setState({
           loading: false,
           text: data.text,
@@ -39,8 +53,9 @@ export default function RevealCard({ pick, pickToken, lang, monthLabel }) {
     };
     // Re-fetches when the language toggle changes — same token, so this
     // never spends another credit, it just asks for a different translation
-    // of the same already-paid-for reveal.
-  }, [pickToken, lang]);
+    // of the same already-paid-for reveal. (Skipped for AI mode — see the
+    // guard above.)
+  }, [pickToken, lang, aiMode]);
 
   return (
     <div className="month-entry">
