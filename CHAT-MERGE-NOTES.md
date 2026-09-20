@@ -125,3 +125,43 @@ Re-verified: `eslint` clean on every new/changed file, `next build`
 compiles successfully (same pre-existing Prisma-engine sandbox limit as
 before, confirmed unrelated to this change).
 
+---
+
+## Update: AI fallback for unmatched/non-Hinglish questions
+
+Per your call: the free keyword matcher (`lib/classify.js`) stays the first
+and only pass for Hinglish/English/Hindi — zero cost, unchanged. AI
+(`lib/ai.js`, new) only runs when that matcher can't map the question, or
+the text isn't in a script it was ever built to read (Devanagari, Tamil,
+Arabic, etc. all trigger it now via the new `looksNonLatinScript()` check).
+Greetings and closings are untouched, per your second answer.
+
+**What actually happens on the AI path:** the card is still drawn exactly
+as before. At reveal time, Claude is shown the drawn card, the seeker's
+real question, and *all 13 of your own existing readings for that exact
+card* — then asked to translate whichever one actually answers the question
+into the seeker's language (staying faithful to it), or, only if none of
+them fit, write an original reading itself in Ginni's voice. One API call,
+not two. Full detail in the README's new "AI fallback" section.
+
+**New requirement:** `ANTHROPIC_API_KEY`, from console.anthropic.com. The
+app runs fine without it — that one feature just shows a "try again"
+message until it's set, exactly like any other reveal failure.
+
+**Files touched:** `lib/ai.js` (new), `lib/classify.js` (now returns `null`
+on no match instead of silently defaulting, plus the new script-detection
+helper), `lib/auth.js` (pick tokens can now carry the raw question),
+`app/api/reading/pick/route.js` and `app/api/reveal/route.js` (both accept
+and branch on a new `"ai"` sentinel topicId), `components/ChatPanel.jsx`
+(decides when to use it), `components/RevealCard.jsx` (added an `aiMode`
+prop so a language-toggle click doesn't waste a second AI call on an
+already-AI-generated reading). Nothing about auth, the database, payments,
+or the existing 15-topic static reading path changed.
+
+Re-verified: `eslint` clean on every new/changed file; `next build`
+compiles (same pre-existing Prisma sandbox limit, unrelated); manually
+re-confirmed all 15 questions still round-trip through the classifier, and
+separately confirmed the per-card reference-reading lookup returns all 13
+expected blocks with real text. I could not test an actual live Anthropic
+API call end-to-end from here — I don't have a key to test with — so the
+first real run is worth watching once `ANTHROPIC_API_KEY` is set.

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { DECK, TOPICS } from "@/lib/topics";
 import { shuffle } from "@/lib/parseReading";
 import { getGreeting, getClosing } from "@/lib/ginni";
-import { classifyQuestion } from "@/lib/classify";
+import { classifyQuestion, looksNonLatinScript } from "@/lib/classify";
 import DrawOverlay from "./DrawOverlay";
 import RevealCard from "./RevealCard";
 import Paywall from "./Paywall";
@@ -82,9 +82,15 @@ export default function ChatPanel({
     const text = (rawText || "").trim();
     if (!text || busyRef.current || activeDrawRef.current) return;
 
-    const topicId = classifyQuestion(text);
-    const topic = TOPICS.find((t) => t.id === topicId) || TOPICS[6];
-    onTopicResolved?.(topicId);
+    // Free classifier first — zero cost, handles Hinglish/English/Hindi
+    // keyword phrasing. Only when it can't map the question at all, or the
+    // text isn't in a script it was ever built to read, does this hand off
+    // to the AI fallback (lib/ai.js, via the "ai" sentinel topicId) — see
+    // classify.js for exactly what "can't map" means.
+    const matchedId = classifyQuestion(text);
+    const useAI = matchedId === null || looksNonLatinScript(text);
+    const topic = TOPICS.find((t) => t.id === matchedId) || TOPICS[6]; // Universe Message — also the generic lead-in when useAI
+    if (!useAI) onTopicResolved?.(matchedId);
 
     const seed = Math.floor(Math.random() * 3);
 
@@ -94,7 +100,13 @@ export default function ChatPanel({
       { id: nextId(), role: "ginni", kind: "text", text: getGreeting(name, lang, topic, seed) },
     ]);
     setInput("");
-    setActiveDraw({ id: nextId(), topicId, spread: shuffle(DECK), flippingCard: null });
+    setActiveDraw({
+      id: nextId(),
+      topicId: useAI ? "ai" : matchedId,
+      question: useAI ? text : undefined,
+      spread: shuffle(DECK),
+      flippingCard: null,
+    });
   }
 
   // A question clicked in the left-hand list arrives here as plain text and
@@ -125,7 +137,7 @@ export default function ChatPanel({
       res = await fetch("/api/reading/pick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topicId: draw.topicId, card: cardName }),
+        body: JSON.stringify({ topicId: draw.topicId, card: cardName, question: draw.question }),
       });
       data = await res.json();
     } catch {
@@ -150,11 +162,12 @@ export default function ChatPanel({
 
     onAccessChange?.(data.access);
     const pickToken = data.pickToken;
+    const aiMode = draw.topicId === "ai";
 
     setTimeout(() => {
       setMessages((m) => [
         ...m,
-        { id: nextId(), role: "ginni", kind: "reveal", card: cardName, pickToken },
+        { id: nextId(), role: "ginni", kind: "reveal", card: cardName, pickToken, aiMode },
         { id: nextId(), role: "ginni", kind: "text", text: getClosing(name, lang, Math.floor(Math.random() * 3)) },
       ]);
       setActiveDraw(null);
@@ -245,7 +258,14 @@ function ChatBubble({ msg, lang }) {
     return (
       <div className="chat-row ginni">
         <div className="chat-bubble ginni chat-bubble--reveal">
-          <RevealCard pick={{ card: msg.card, monthIndex: 1 }} pickToken={msg.pickToken} lang={lang} monthLabel={null} />
+          {msg.aiMode && <div className="chat-ai-tag">✨ Ginni&apos;s own words for your question</div>}
+          <RevealCard
+            pick={{ card: msg.card, monthIndex: 1 }}
+            pickToken={msg.pickToken}
+            lang={lang}
+            monthLabel={null}
+            aiMode={msg.aiMode}
+          />
         </div>
       </div>
     );

@@ -3,6 +3,7 @@ import { verifyPickToken } from "@/lib/auth";
 import { TOPICS, UNAVAILABLE_MESSAGE } from "@/lib/topics";
 import { READINGS } from "@/lib/readings";
 import { getReadingFor } from "@/lib/parseReading";
+import { composeAIReading } from "@/lib/ai";
 
 // This is the only route that ever touches lib/readings.js — that file (and
 // everything in /data) is never imported by client components anymore, so
@@ -19,6 +20,22 @@ export async function GET(req) {
   }
 
   try {
+    // AI fallback path: the client's free classifier (lib/classify.js)
+    // couldn't map this question to any of the 15 topics, or it wasn't
+    // typed in Hinglish/English/Hindi at all. lib/ai.js takes it from here
+    // — see that file for exactly what it's given and asked to do. `lang`
+    // is ignored here on purpose: the AI reading already matches whatever
+    // language the seeker's own question was in, which is the actual goal,
+    // and re-running it on every sidebar language toggle would just spend
+    // another AI call for no benefit.
+    if (payload.topicId === "ai") {
+      const text = await composeAIReading({ card: payload.card, question: payload.question });
+      if (!text) {
+        return NextResponse.json({ available: false, text: null, fallbackMessage: UNAVAILABLE_MESSAGE[lang] || UNAVAILABLE_MESSAGE.hinglish });
+      }
+      return NextResponse.json({ available: true, text, aiGenerated: true, singleLanguageSource: null, fallbackMessage: null });
+    }
+
     const topic = TOPICS.find((t) => t.id === payload.topicId);
     if (!topic) {
       return NextResponse.json({ error: "Unknown question." }, { status: 400 });

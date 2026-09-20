@@ -1351,6 +1351,11 @@ button{font-family:inherit;}
   border:1px solid rgba(230,178,60,0.22);
 }
 .chat-bubble--reveal .month-entry{margin-bottom:0; padding-bottom:0; border-bottom:none;}
+.chat-ai-tag{
+  font-size:11px; letter-spacing:.03em; text-transform:uppercase;
+  color:var(--gold-soft); opacity:0.8;
+  margin-bottom:8px;
+}
 
 .chat-composer-wrap{
   position:sticky;
