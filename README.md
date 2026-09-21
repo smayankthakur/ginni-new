@@ -37,11 +37,12 @@ variables (e.g. Vercel project settings) — `.env.local` is gitignored and
 never gets deployed automatically. Run `npx prisma migrate deploy` against
 your production database before the first deploy.
 
-Optional: `ANTHROPIC_API_KEY` **or** `OPENAI_API_KEY` — only needed for the
-AI fallback reading (see "AI fallback for unmatched/non-Hinglish questions"
-below). Set whichever one you have; if both are set, Anthropic is used. The
-app runs fine with neither set; that one feature just quietly falls back to
-a "try again" message if no key is configured.
+Optional: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, **or** `GEMINI_API_KEY` —
+only needed for the AI fallback reading (see "AI fallback for
+unmatched/non-Hinglish questions" below). Set whichever one you have; if
+more than one is set, Anthropic is used, then OpenAI, then Gemini. The app
+runs fine with none set; that one feature just quietly falls back to a
+"try again" message if no key is configured.
 
 ## Accounts & server-side enforcement
 
@@ -218,8 +219,9 @@ readings for that card* (one per underlying data file), and asks it to:
    the card's meaning, in Ginni's voice, in the seeker's own language.
 
 This is one API call (not two), and it's the only thing in the app that
-touches `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` — set either one; Anthropic is
-used if both are present (`lib/ai.js`'s `getProvider()`). Language-toggling the sidebar after
+touches `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`/`GEMINI_API_KEY` — set any one
+of the three; priority is Anthropic, then OpenAI, then Gemini if more than
+one is present (`lib/ai.js`'s `getProvider()`). Language-toggling the sidebar after
 an AI-generated reading is deliberately a no-op (see `RevealCard.jsx`'s
 `aiMode` prop) — re-running the AI on every toggle click would just spend
 another call to produce a near-identical result, since the reading already

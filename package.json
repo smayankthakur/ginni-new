@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",
+    "@google/genai": "^2.23.0",
     "@prisma/client": "6.19.3",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",

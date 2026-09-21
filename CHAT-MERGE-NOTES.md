@@ -199,3 +199,20 @@ This isn't a substitute for confirming the actual `DATABASE_URL`
 "Needs Attention" flag's cause — it just means you shouldn't see this
 particular error reach the screen anymore while that's still being tracked
 down.
+---
+
+## Update: Gemini added as a third AI provider option
+
+`lib/ai.js` now also accepts `GEMINI_API_KEY` (Google AI Studio), alongside
+Anthropic and OpenAI — set any one of the three. Priority if more than one
+is set: Anthropic, then OpenAI, then Gemini. Uses `@google/genai` (Google's
+current official SDK) and `gemini-2.5-flash` (their fast/cheap tier, same
+role as Haiku/gpt-4o-mini for the other two).
+
+**Important:** the Gemini key shared in chat has been treated as exposed —
+I did not use it anywhere in code or docs, only the env var name
+`GEMINI_API_KEY`. Regenerate it at aistudio.google.com/apikey before using
+it for real, the same as any credential pasted into a chat.
+
+`eslint` clean on the changed file; `next build` compiles (same pre-existing,
+unrelated Prisma sandbox limit as always).
