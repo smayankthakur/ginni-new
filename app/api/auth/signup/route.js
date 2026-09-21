@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { hashPassword, setSessionCookie, summarizeAccess } from "@/lib/auth";
+import { withRetry } from "@/lib/withRetry";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -30,15 +31,17 @@ export async function POST(req) {
   const normalizedEmail = email.trim().toLowerCase();
 
   try {
-    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    const existing = await withRetry(() => prisma.user.findUnique({ where: { email: normalizedEmail } }));
     if (existing) {
       return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
     }
 
     const passwordHash = await hashPassword(password);
-    const user = await prisma.user.create({
-      data: { email: normalizedEmail, passwordHash, name: name?.trim() || null },
-    });
+    const user = await withRetry(() =>
+      prisma.user.create({
+        data: { email: normalizedEmail, passwordHash, name: name?.trim() || null },
+      })
+    );
 
     await setSessionCookie(user.id);
 

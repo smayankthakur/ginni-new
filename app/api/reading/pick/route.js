@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionUser, summarizeAccess, createPickToken } from "@/lib/auth";
 import { TOPICS, DECK } from "@/lib/topics";
+import { withRetry } from "@/lib/withRetry";
 
 // Drawing a card is the "spend a credit" moment — charged here, before any
 // reading text is ever sent to the client. Language switches on an already
@@ -53,10 +54,12 @@ export async function POST(req) {
     // need their usage counted at all.
     const updated = subscribed
       ? user
-      : await prisma.user.update({
-          where: { id: user.id },
-          data: { readingsUsed: { increment: 1 } },
-        });
+      : await withRetry(() =>
+          prisma.user.update({
+            where: { id: user.id },
+            data: { readingsUsed: { increment: 1 } },
+          })
+        );
 
     const pickToken = createPickToken({
       userId: user.id,

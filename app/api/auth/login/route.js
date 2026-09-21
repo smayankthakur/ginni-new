@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyPassword, setSessionCookie, summarizeAccess } from "@/lib/auth";
+import { withRetry } from "@/lib/withRetry";
 
 export async function POST(req) {
   if (!process.env.DATABASE_URL) {
@@ -25,7 +26,7 @@ export async function POST(req) {
   const normalizedEmail = email.trim().toLowerCase();
 
   try {
-    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    const user = await withRetry(() => prisma.user.findUnique({ where: { email: normalizedEmail } }));
 
     if (!user || !(await verifyPassword(password, user.passwordHash))) {
       return NextResponse.json({ error: "Incorrect email or password." }, { status: 401 });

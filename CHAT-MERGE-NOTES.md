@@ -165,3 +165,37 @@ separately confirmed the per-card reference-reading lookup returns all 13
 expected blocks with real text. I could not test an actual live Anthropic
 API call end-to-end from here — I don't have a key to test with — so the
 first real run is worth watching once `ANTHROPIC_API_KEY` is set.
+---
+
+## Update: automatic retry for the intermittent "Please log in first" error
+
+Your screenshots showed something important: the *same* action (asking
+"Aapke Rishte Ka Past, Present Aur Future" twice in a row) succeeded once
+and failed once, back to back, in the same session — not a permanent
+break, an intermittent one. That's the signature of Supabase's pooled
+connection occasionally handing Prisma a connection with another request's
+leftover state on it (Postgres error 26000, "prepared statement does not
+exist") — a known PgBouncer/Prisma interaction that `?pgbouncer=true`
+reduces but doesn't always fully eliminate under real traffic.
+
+Rather than keep tuning the connection string blind, `lib/withRetry.js`
+(new) now wraps every database call in the login, signup, and
+session-check path (`lib/auth.js`'s `getSessionUser`, both auth routes,
+and the credit-charging update in `/api/reading/pick`) so that — and only
+that — specific, well-understood transient error is retried automatically
+(up to twice, with a short backoff) before it's ever shown to a user. A
+real error — wrong password, a genuinely unreachable database — still
+fails immediately, unchanged; this only catches the one error signature
+that's shown up in your logs.
+
+Verified with a standalone test: retries and succeeds when the transient
+error clears within 2 attempts, does not retry a real (non-transient)
+error at all, and correctly gives up and throws after exhausting retries
+if the transient error never clears. `eslint` and `next build` both clean
+on every new/changed file (same pre-existing, unrelated Prisma-engine
+sandbox limit as always on the build step).
+
+This isn't a substitute for confirming the actual `DATABASE_URL`
+"Needs Attention" flag's cause — it just means you shouldn't see this
+particular error reach the screen anymore while that's still being tracked
+down.
