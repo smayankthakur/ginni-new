@@ -9,9 +9,16 @@ const SINGLE_LANG_NOTE = {
   hindi: "यह रीडिंग अभी सिर्फ हिंग्लिश में लिखी गई है — हिंदी वर्शन जल्द आएगा।",
 };
 
-export default function RevealCard({ pick, pickToken, lang, monthLabel, aiMode }) {
+export default function RevealCard({ pick, pickToken, lang, monthLabel, aiMode, resolvedText, onResolved }) {
   const [imgFailed, setImgFailed] = useState(false);
-  const [state, setState] = useState({ loading: true, text: null, available: false, singleLanguageSource: false });
+  // Loaded-from-history messages arrive with resolvedText already set —
+  // render immediately, no fetch, no token needed (the pick token behind a
+  // saved message has long since expired by the time it's reloaded).
+  const [state, setState] = useState(() =>
+    resolvedText
+      ? { loading: false, text: resolvedText, available: true, singleLanguageSource: false }
+      : { loading: true, text: null, available: false, singleLanguageSource: false }
+  );
   const src = `/cards/${cardSlug(pick.card)}.png`;
   // AI-generated readings already match the seeker's own question language
   // — that's the actual point of them — so a later lang-toggle click
@@ -19,9 +26,10 @@ export default function RevealCard({ pick, pickToken, lang, monthLabel, aiMode }
   // another cost. This remembers which token we've already fetched for and
   // skips re-fetching in that one case; every normal (non-AI) reveal still
   // re-fetches on every lang change exactly as before.
-  const fetchedForRef = useRef(null);
+  const fetchedForRef = useRef(resolvedText ? pickToken : null);
 
   useEffect(() => {
+    if (resolvedText) return; // already-resolved history — nothing to fetch, ever
     if (aiMode && fetchedForRef.current === pickToken) return;
 
     let cancelled = false;
@@ -42,6 +50,7 @@ export default function RevealCard({ pick, pickToken, lang, monthLabel, aiMode }
           available: !!data.available,
           singleLanguageSource: !!data.singleLanguageSource,
         });
+        if (data.available && data.text) onResolved?.(data.text);
       })
       .catch(() => {
         if (cancelled) return;
@@ -53,9 +62,9 @@ export default function RevealCard({ pick, pickToken, lang, monthLabel, aiMode }
     };
     // Re-fetches when the language toggle changes — same token, so this
     // never spends another credit, it just asks for a different translation
-    // of the same already-paid-for reveal. (Skipped for AI mode — see the
-    // guard above.)
-  }, [pickToken, lang, aiMode]);
+    // of the same already-paid-for reveal. (Skipped for AI mode and for
+    // already-resolved history — see the guards above.)
+  }, [pickToken, lang, aiMode, resolvedText, onResolved]);
 
   return (
     <div className="month-entry">

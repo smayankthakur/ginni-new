@@ -216,3 +216,71 @@ it for real, the same as any credential pasted into a chat.
 
 `eslint` clean on the changed file; `next build` compiles (same pre-existing,
 unrelated Prisma sandbox limit as always).
+---
+
+## Update: free-by-default guaranteed readings, chit-chat handling, and persisted chat history
+
+Per your answers: no AI, no API, by default — guaranteed zero cost. Chat
+history keeps the last ~30 messages per account. Off-topic chit-chat gets
+an in-character reply with no card drawn.
+
+**Every question now always gets a real reading, for free.** When the free
+keyword matcher can't map a question to one of the 15 topics, `/api/reveal`
+no longer falls back to "not available" — `lib/localFallback.js` (new)
+builds a real reading from this app's own "Universe Message" content for
+the drawn card, with a line echoing the seeker's actual question back to
+them. Zero API calls, zero cost, always works. I also broadened
+`lib/classify.js`'s keyword rules with more synonyms (propose, reunite,
+cheating, truly love, wedding, etc.) so more real questions match a real
+topic directly rather than needing the fallback at all. If you ever do set
+an AI key later, it's still tried first automatically — this is purely the
+new default floor under it, not a replacement for the AI path.
+
+**Chit-chat ("hi," "thanks," a bare greeting) no longer draws a card.**
+`isOffTopicChitchat()` (new, in `lib/classify.js`) catches *only* messages
+that are just small talk with nothing else in them — deliberately
+conservative, so "hi, when will I get married?" still gets a full reading.
+Ginni replies in character instead (`CHITCHAT_REPLIES` in
+`ChatPanel.jsx`), no card, no credit spent.
+
+**Chat history persists across logins**, capped at the most recent 30
+messages per account (older ones are pruned automatically on every new
+save — the table stays small by design). A saved "reveal" message stores
+the finished reading text directly, not the pick token (those expire in 20
+minutes) — `RevealCard.jsx` got a `resolvedText` prop so replaying history
+never needs to re-fetch anything. Saving is fire-and-forget: if it fails,
+the live chat keeps working exactly as before, that one message just won't
+be there next time.
+
+**New database table required** — `ChatMessage`. The exact SQL to run once
+in Supabase's SQL Editor is in the README's "Chat history" section (also
+saved as a proper migration file at
+`prisma/migrations/20260921090000_add_chat_messages/`, so `prisma migrate
+deploy` picks it up too if you ever run migrations that way). Both new
+API routes fail soft if the table doesn't exist yet — history just won't
+load/save, nothing breaks — so there's no urgency here, but the feature
+won't do anything until it's run.
+
+**Files touched:** `lib/localFallback.js` (new), `lib/classify.js`
+(broadened rules + `isOffTopicChitchat`), `app/api/reveal/route.js` (local
+fallback wired in after AI), `app/api/chat/history/route.js` (new),
+`app/api/chat/messages/route.js` (new), `prisma/schema.prisma` +
+migration (new `ChatMessage` model), `components/ChatPanel.jsx` (history
+load/save, chit-chat handling), `components/RevealCard.jsx`
+(`resolvedText`/`onResolved` for history replay). Nothing about auth,
+payments, or the existing 15-topic reading path changed.
+
+Also fixed in passing: a newer ESLint rule now flags the sidebar-click
+effect the same way it flagged `DrawOverlay.jsx` earlier — deferred with
+the same pattern.
+
+Re-verified: `eslint` clean on every changed file (only the pre-existing,
+untouched `ReadingPanel.jsx` still flags, same as every round). All 15
+questions still round-trip through the classifier. Chit-chat detection
+tested against both pure greetings (correctly caught) and greetings
+embedded in real questions like "hi, when will I get married?" (correctly
+NOT caught). The broadened keyword rules tested against several previously
+-unmatched phrasings (propose, truly love, wedding, reunite, cheating) —
+all now match correctly. The local fallback composer tested end-to-end
+against real data and produces a genuine, well-formed reading. `next
+build` compiles (same pre-existing, unrelated Prisma sandbox limit).

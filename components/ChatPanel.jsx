@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { DECK, TOPICS } from "@/lib/topics";
 import { shuffle } from "@/lib/parseReading";
 import { getGreeting, getClosing } from "@/lib/ginni";
-import { classifyQuestion, looksNonLatinScript } from "@/lib/classify";
+import { classifyQuestion, looksNonLatinScript, isOffTopicChitchat } from "@/lib/classify";
 import DrawOverlay from "./DrawOverlay";
 import RevealCard from "./RevealCard";
 import Paywall from "./Paywall";
@@ -16,6 +16,25 @@ const INTRO = {
     `Namaste ${name}! I'm Ginni. Type your question, or pick one from the list on the left — I'll understand it and draw a card for you.`,
   hindi: (name) =>
     `नमस्ते ${name}! मैं जिन्नी हूँ। अपना सवाल टाइप कीजिए, या बायीं तरफ़ से कोई सवाल चुनिए — मैं समझ कर आपके लिए एक कार्ड निकालती हूँ।`,
+};
+
+// In-character replies for pure small talk (see isOffTopicChitchat in
+// lib/classify.js) — no card draw, no credit spent, per Mayank's call.
+// A couple of variants each so it doesn't feel like the same canned line
+// every time.
+const CHITCHAT_REPLIES = {
+  hinglish: [
+    "Haha, main yahan tarot padhne ke liye hoon, bas chit-chat ke liye nahi! 😄 Koi sawaal poochiye — pyaar, shaadi, career — main dil se jawab dungi.",
+    "Main theek hoon, shukriya poochne ke liye! Par main sabse zyada tab kaam aati hoon jab aap koi sacha sawaal poochte hain — try kijiye na? 💜",
+  ],
+  english: [
+    "Haha, I'm here for tarot readings, not just chit-chat! Ask me something real — about love, marriage, career — and I'll answer from the heart.",
+    "I'm well, thank you for asking! But I'm most useful when you bring me an actual question — go on, try me. 💜",
+  ],
+  hindi: [
+    "हाहा, मैं यहाँ टैरो रीडिंग के लिए हूँ, सिर्फ़ बातचीत के लिए नहीं! प्यार, शादी, करियर के बारे में कुछ पूछिए — मैं दिल से जवाब दूँगी।",
+    "मैं ठीक हूँ, पूछने के लिए शुक्रिया! पर मैं तब सबसे ज़्यादा काम आती हूँ जब आप कोई असली सवाल पूछते हैं — पूछिए ना? 💜",
+  ],
 };
 
 const LIMIT_MESSAGE = {
@@ -48,6 +67,18 @@ function nextId() {
   return idCounter;
 }
 
+// Fire-and-forget: persisted history is a nice-to-have layered on top of a
+// chat that already works fully from local state, so a save failing here
+// never blocks or errors the live conversation — it just means that one
+// message won't be there next time they log in.
+function persistMessage({ role, kind, text, card }) {
+  fetch("/api/chat/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role, kind, text, card }),
+  }).catch(() => {});
+}
+
 export default function ChatPanel({
   name,
   lang,
@@ -57,9 +88,8 @@ export default function ChatPanel({
   onConsumedAsk,
   onTopicResolved,
 }) {
-  const [messages, setMessages] = useState(() => [
-    { id: nextId(), role: "ginni", kind: "text", text: INTRO[lang]?.(name) || INTRO.hinglish(name) },
-  ]);
+  const [messages, setMessages] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [input, setInput] = useState("");
   // The card-draw ritual happens full-screen (see DrawOverlay), not inline
   // in the thread — matches chat.thedivinetarotonline.com's own pattern,
@@ -71,8 +101,43 @@ export default function ChatPanel({
 
   const busyRef = useRef(false);
   const activeDrawRef = useRef(null);
+  // Guards each reveal message against being saved more than once — a
+  // language-toggle click re-fetches the same reveal (see RevealCard.jsx)
+  // and would otherwise re-persist a duplicate row every time.
+  const persistedRevealIds = useRef(new Set());
   useEffect(() => { busyRef.current = busy; }, [busy]);
   useEffect(() => { activeDrawRef.current = activeDraw; }, [activeDraw]);
+
+  // Loads the last ~30 saved messages for this account on mount. An empty
+  // (or failed) history falls back to the same fresh greeting as before —
+  // a brand-new account has never had anything to load.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/chat/history")
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const loaded = (data.messages || []).map((m) =>
+          m.kind === "reveal"
+            ? { id: m.id, role: "ginni", kind: "reveal", card: m.card, pickToken: null, aiMode: m.aiMode, resolvedText: m.text }
+            : { id: m.id, role: m.role, kind: "text", text: m.text }
+        );
+        setMessages(loaded.length ? loaded : [{ id: nextId(), role: "ginni", kind: "text", text: INTRO[lang]?.(name) || INTRO.hinglish(name) }]);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setMessages([{ id: nextId(), role: "ginni", kind: "text", text: INTRO[lang]?.(name) || INTRO.hinglish(name) }]);
+      })
+      .finally(() => {
+        if (!cancelled) setHistoryLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Only ever runs once, on mount — a lang toggle afterward shouldn't
+    // reload (and definitely shouldn't re-greet) an already-loaded chat.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -80,26 +145,47 @@ export default function ChatPanel({
 
   function handleSend(rawText) {
     const text = (rawText || "").trim();
-    if (!text || busyRef.current || activeDrawRef.current) return;
+    if (!text || busyRef.current || activeDrawRef.current || historyLoading) return;
+
+    // Pure small talk gets an in-character reply and nothing else — no
+    // card, no credit spent, per Mayank's call. Checked before the real
+    // classifier so "hi" never accidentally forces a reading.
+    if (isOffTopicChitchat(text)) {
+      const replies = CHITCHAT_REPLIES[lang] || CHITCHAT_REPLIES.hinglish;
+      const reply = replies[Math.floor(Math.random() * replies.length)];
+      setMessages((m) => [
+        ...m,
+        { id: nextId(), role: "user", text },
+        { id: nextId(), role: "ginni", kind: "text", text: reply },
+      ]);
+      setInput("");
+      persistMessage({ role: "user", kind: "text", text });
+      persistMessage({ role: "ginni", kind: "text", text: reply });
+      return;
+    }
 
     // Free classifier first — zero cost, handles Hinglish/English/Hindi
-    // keyword phrasing. Only when it can't map the question at all, or the
-    // text isn't in a script it was ever built to read, does this hand off
-    // to the AI fallback (lib/ai.js, via the "ai" sentinel topicId) — see
-    // classify.js for exactly what "can't map" means.
+    // keyword phrasing. When it can't map the question at all, or the text
+    // isn't in a script it was ever built to read, this still always ends
+    // in a real reading — either real AI if a provider key is configured
+    // (lib/ai.js), or lib/localFallback.js's zero-cost local reading if
+    // not, which is the default. See app/api/reveal/route.js.
     const matchedId = classifyQuestion(text);
     const useAI = matchedId === null || looksNonLatinScript(text);
     const topic = TOPICS.find((t) => t.id === matchedId) || TOPICS[6]; // Universe Message — also the generic lead-in when useAI
     if (!useAI) onTopicResolved?.(matchedId);
 
     const seed = Math.floor(Math.random() * 3);
+    const greeting = getGreeting(name, lang, topic, seed);
 
     setMessages((m) => [
       ...m,
       { id: nextId(), role: "user", text },
-      { id: nextId(), role: "ginni", kind: "text", text: getGreeting(name, lang, topic, seed) },
+      { id: nextId(), role: "ginni", kind: "text", text: greeting },
     ]);
     setInput("");
+    persistMessage({ role: "user", kind: "text", text });
+    persistMessage({ role: "ginni", kind: "text", text: greeting });
     setActiveDraw({
       id: nextId(),
       topicId: useAI ? "ai" : matchedId,
@@ -111,11 +197,14 @@ export default function ChatPanel({
 
   // A question clicked in the left-hand list arrives here as plain text and
   // is sent through the exact same understanding step as anything typed —
-  // it never jumps straight to a topic lookup.
+  // it never jumps straight to a topic lookup. Deferred one tick so the
+  // setState calls inside handleSend() don't run synchronously within this
+  // effect's body.
   useEffect(() => {
     if (pendingAsk?.text) {
-      handleSend(pendingAsk.text);
+      const t = setTimeout(() => handleSend(pendingAsk.text), 0);
       onConsumedAsk?.();
+      return () => clearTimeout(t);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingAsk]);
@@ -123,7 +212,19 @@ export default function ChatPanel({
   function handleCancelDraw() {
     if (busyRef.current) return; // a card is already being charged/fetched — too late to cancel
     setActiveDraw(null);
-    setMessages((m) => [...m, { id: nextId(), role: "ginni", kind: "text", text: CANCELLED_NOTE[lang] || CANCELLED_NOTE.hinglish }]);
+    const text = CANCELLED_NOTE[lang] || CANCELLED_NOTE.hinglish;
+    setMessages((m) => [...m, { id: nextId(), role: "ginni", kind: "text", text }]);
+    persistMessage({ role: "ginni", kind: "text", text });
+  }
+
+  // Called by RevealCard the first time a reveal actually resolves to real
+  // text — this is where the finished reading gets saved, with the text
+  // already baked in (the pick token itself is never stored; it expires in
+  // 20 minutes and history needs to outlive that).
+  function handleRevealResolved(msgId, card, aiMode, text) {
+    if (persistedRevealIds.current.has(msgId)) return;
+    persistedRevealIds.current.add(msgId);
+    persistMessage({ role: "ginni", kind: "reveal", text, card, aiMode });
   }
 
   async function handlePick(cardName) {
@@ -165,25 +266,31 @@ export default function ChatPanel({
     const aiMode = draw.topicId === "ai";
 
     setTimeout(() => {
+      const closing = getClosing(name, lang, Math.floor(Math.random() * 3));
       setMessages((m) => [
         ...m,
         { id: nextId(), role: "ginni", kind: "reveal", card: cardName, pickToken, aiMode },
-        { id: nextId(), role: "ginni", kind: "text", text: getClosing(name, lang, Math.floor(Math.random() * 3)) },
+        { id: nextId(), role: "ginni", kind: "text", text: closing },
       ]);
+      persistMessage({ role: "ginni", kind: "text", text: closing });
       setActiveDraw(null);
       setBusy(false);
     }, 620); // matches the existing card-flip timing from the original ReadingPanel.jsx
   }
 
-  const composerDisabled = busy || !!activeDraw;
+  const composerDisabled = busy || !!activeDraw || historyLoading;
   const freeLeft = access?.freeLeft ?? 0;
 
   return (
     <div className="chat-shell">
       <div className="chat-thread">
-        {messages.map((msg) => (
-          <ChatBubble key={msg.id} msg={msg} lang={lang} />
-        ))}
+        {historyLoading ? (
+          <div className="chat-row ginni">
+            <div className="chat-bubble ginni">Aapki purani baatein la rahi hoon…</div>
+          </div>
+        ) : (
+          messages.map((msg) => <ChatBubble key={msg.id} msg={msg} lang={lang} onRevealResolved={handleRevealResolved} />)
+        )}
         <div ref={endRef} />
       </div>
 
@@ -245,7 +352,7 @@ export default function ChatPanel({
   );
 }
 
-function ChatBubble({ msg, lang }) {
+function ChatBubble({ msg, lang, onRevealResolved }) {
   if (msg.role === "user") {
     return (
       <div className="chat-row user">
@@ -265,6 +372,8 @@ function ChatBubble({ msg, lang }) {
             lang={lang}
             monthLabel={null}
             aiMode={msg.aiMode}
+            resolvedText={msg.resolvedText}
+            onResolved={msg.resolvedText ? undefined : (text) => onRevealResolved(msg.id, msg.card, msg.aiMode, text)}
           />
         </div>
       </div>
