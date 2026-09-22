@@ -18,14 +18,39 @@ datasource db {
 }
 
 model User {
-  id                  String    @id @default(cuid())
-  email               String    @unique
+  id                  String        @id @default(cuid())
+  email               String        @unique
   passwordHash        String
   name                String?
-  readingsUsed        Int       @default(0)
+  readingsUsed        Int           @default(0)
   subscriptionExpires DateTime?
-  createdAt           DateTime  @default(now())
+  createdAt           DateTime      @default(now())
   orders              Order[]
+  chatMessages        ChatMessage[]
+}
+
+// Persisted chat history, per account — only the last ~30 messages are
+// kept per user (pruned in app/api/chat/messages/route.js on every insert)
+// so this table stays small by design rather than growing forever.
+// `text` already has any card image/data baked in as plain text — a
+// "reveal" message's `card` field is the drawn card name, needed to show
+// its artwork again; the pick token itself is never stored (it expires in
+// 20 minutes and isn't needed once the reading text is saved here).
+// `aiMode` records whether a reveal came from an unmatched question (AI or
+// the local fallback) rather than one of the 15 direct-match topics, so
+// replaying history later can still tag it correctly.
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String // "user" | "ginni"
+  kind      String // "text" | "reveal"
+  text      String?  @db.Text
+  card      String? // only set when kind is "reveal"
+  aiMode    Boolean  @default(false) // only meaningful when kind is "reveal"
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model Order {

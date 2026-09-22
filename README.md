@@ -38,11 +38,84 @@ never gets deployed automatically. Run `npx prisma migrate deploy` against
 your production database before the first deploy.
 
 Optional: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, **or** `GEMINI_API_KEY` —
-only needed for the AI fallback reading (see "AI fallback for
-unmatched/non-Hinglish questions" below). Set whichever one you have; if
-more than one is set, Anthropic is used, then OpenAI, then Gemini. The app
-runs fine with none set; that one feature just quietly falls back to a
-"try again" message if no key is configured.
+only needed if you want real per-question AI writing (see "AI fallback"
+below). None of these are required, and leaving all three unset is the
+recommended default for a free deployment: without a key, an unmatched
+question still always gets a real reading, just from this app's own data
+instead of an external call.
+
+## AI fallback for unmatched/non-Hinglish questions
+
+By default — **no AI provider key configured, which is the recommended
+setup for a $0 deployment** — `lib/classify.js`'s free keyword matcher is
+the only thing that runs for a typed question, and when it can't map one
+to any of the 15 topics, `lib/localFallback.js` guarantees a real, relevant
+reading anyway: it takes this app's own "Universe Message" reading for the
+card that was drawn (broadly-applicable guidance, one of the 15 topics
+already in your data) and wraps it with a line that echoes the seeker's
+own question back to them. Zero API calls, zero cost, always available —
+"the system must respond to every question" holds true with no external
+service involved at all.
+
+If you ever do want real per-question AI writing instead, set
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY` and it's used
+automatically — `/api/reveal/route.js` tries AI first and only falls back
+to the local reading above if no key is configured or the AI call itself
+fails. Priority if more than one is set: Anthropic, then OpenAI, then
+Gemini (`lib/ai.js`'s `getProvider()`). When AI is used, it's shown the
+drawn card, the seeker's exact question, and all 13 of this app's own
+existing readings for that card, and asked to translate whichever one
+actually answers the question (staying faithful to it) or, only if none
+fit, write an original reading — one API call either way. Language-
+toggling the sidebar afterward is deliberately a no-op for an AI-generated
+reading (`RevealCard.jsx`'s `aiMode` prop) — it already matches the
+language the question was asked in, so re-running it would just spend
+another call for a near-identical result. Known limitation: no caching, so
+a page refresh mid-AI-reading calls the API again rather than replaying
+the first result.
+
+Pure small talk — "hi," "thanks," a greeting with nothing else in it — is
+handled separately and before any of this: `isOffTopicChitchat()` in
+`lib/classify.js` catches it, and Ginni replies in character with no card
+drawn and no credit spent (see `CHITCHAT_REPLIES` in `ChatPanel.jsx`).
+Anything with real content alongside a greeting ("hi, when will I get
+married?") still gets a full reading — the check is deliberately
+conservative so a genuine question is never brushed off.
+
+## Chat history
+
+The last ~30 messages per account are saved and reloaded on login
+(`app/api/chat/history/route.js`, `app/api/chat/messages/route.js`) — kept
+small on purpose rather than growing forever. A saved "reveal" message
+stores the finished reading text directly, not the pick token (which
+expires in 20 minutes) — `components/RevealCard.jsx`'s `resolvedText` prop
+renders it with no re-fetch. Saving never blocks or errors the live chat:
+if it fails, the conversation keeps working locally, that one message just
+won't be there next time.
+
+**Requires a new database table.** Run this once — Supabase dashboard →
+SQL Editor → New query → paste and run:
+
+```sql
+CREATE TABLE "ChatMessage" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "role" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "text" TEXT,
+    "card" TEXT,
+    "aiMode" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ChatMessage_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX "ChatMessage_userId_createdAt_idx" ON "ChatMessage"("userId", "createdAt");
+
+ALTER TABLE "ChatMessage" ADD CONSTRAINT "ChatMessage_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+```
+
+This is the same SQL as `prisma/migrations/20260921090000_add_chat_messages/migration.sql` — that file exists so `npx prisma migrate deploy` picks it up too if you ever run migrations that way instead.
 
 ## Accounts & server-side enforcement
 
@@ -195,47 +268,11 @@ the parser against every file, not by inspection.
 
 `lib/classify.js`'s free keyword matcher is the first and only pass for
 anything typed in Hinglish/English/Hindi that maps cleanly to one of the 15
-topics — no AI, no cost, unchanged from before. It only hands off to
-`lib/ai.js` (an Anthropic API call) in two cases:
-
-- The question doesn't match any of the 15 topics' keyword rules, or
-- `classify.js`'s `looksNonLatinScript()` flags the text as mostly outside
-  the Latin-alphabet range (Devanagari, Tamil, Arabic, Cyrillic, etc.) —
-  since the keyword rules can only ever recognise Latin-script phrasing.
-
-When that happens, the card is still drawn exactly as normal (same ritual,
-same credit charge), but `/api/reading/pick` sends the pick token through
-with the sentinel `topicId: "ai"` plus the raw question text instead of a
-real topic id. At reveal time, `/api/reveal` calls
-`composeAIReading({ card, question })`, which sends Claude the drawn card,
-the seeker's exact question, and *all 13 of this app's own existing
-readings for that card* (one per underlying data file), and asks it to:
-
-1. work out what language the question is written in,
-2. translate whichever listed reading actually answers it into that
-   language if one clearly does (staying faithful to the original —
-   nothing invented), or
-3. only if none of them fit, write an original reading itself, grounded in
-   the card's meaning, in Ginni's voice, in the seeker's own language.
-
-This is one API call (not two), and it's the only thing in the app that
-touches `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`/`GEMINI_API_KEY` — set any one
-of the three; priority is Anthropic, then OpenAI, then Gemini if more than
-one is present (`lib/ai.js`'s `getProvider()`). Language-toggling the sidebar after
-an AI-generated reading is deliberately a no-op (see `RevealCard.jsx`'s
-`aiMode` prop) — re-running the AI on every toggle click would just spend
-another call to produce a near-identical result, since the reading already
-matches the language the question was actually asked in.
-
-If the key is missing, or the API call fails for any reason,
-`composeAIReading()` returns `null` and the reveal shows the same
-"couldn't load this reading" fallback any other reveal failure would.
-
-Known limitation: there's no caching yet, so re-opening `/api/reveal` for
-the same AI-mode token (a page refresh mid-reading, for instance) calls the
-API again rather than replaying the first result. Worth adding if that
-turns out to matter in practice — it'd need a small table or KV store
-keyed by the pick token.
+topics — no AI, no cost. It only hands off further in two cases: the
+question doesn't match any of the 15 topics' keyword rules, or
+`looksNonLatinScript()` flags the text as mostly outside the Latin-alphabet
+range. See the "AI fallback" section near the top of this file for what
+happens next — by default that's the free local reading, not AI.
 
 ## Spread & draw behaviour
 

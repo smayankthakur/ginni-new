@@ -4,6 +4,7 @@ import { TOPICS, UNAVAILABLE_MESSAGE } from "@/lib/topics";
 import { READINGS } from "@/lib/readings";
 import { getReadingFor } from "@/lib/parseReading";
 import { composeAIReading } from "@/lib/ai";
+import { composeLocalReading } from "@/lib/localFallback";
 
 // This is the only route that ever touches lib/readings.js — that file (and
 // everything in /data) is never imported by client components anymore, so
@@ -20,20 +21,32 @@ export async function GET(req) {
   }
 
   try {
-    // AI fallback path: the client's free classifier (lib/classify.js)
-    // couldn't map this question to any of the 15 topics, or it wasn't
-    // typed in Hinglish/English/Hindi at all. lib/ai.js takes it from here
-    // — see that file for exactly what it's given and asked to do. `lang`
-    // is ignored here on purpose: the AI reading already matches whatever
-    // language the seeker's own question was in, which is the actual goal,
-    // and re-running it on every sidebar language toggle would just spend
-    // another AI call for no benefit.
+    // Fallback path: the client's free classifier (lib/classify.js)
+    // couldn't map this question to any of the 15 topics. Real AI
+    // (lib/ai.js) is tried first, but only if a provider key is actually
+    // configured — by default, none is, and composeAIReading() returns
+    // null immediately without making any call. Either way, this always
+    // ends in a real reading via lib/localFallback.js: "system must
+    // respond to every question" holds even on a $0 deployment with no AI
+    // key at all. `lang` is only used by the local path (it picks the
+    // seeker's session language) — an AI reading already matches whatever
+    // language the question was asked in, so re-running it on every
+    // sidebar language toggle would just spend another call for nothing.
     if (payload.topicId === "ai") {
-      const text = await composeAIReading({ card: payload.card, question: payload.question });
-      if (!text) {
-        return NextResponse.json({ available: false, text: null, fallbackMessage: UNAVAILABLE_MESSAGE[lang] || UNAVAILABLE_MESSAGE.hinglish });
+      const aiText = await composeAIReading({ card: payload.card, question: payload.question });
+      if (aiText) {
+        return NextResponse.json({ available: true, text: aiText, aiGenerated: true, singleLanguageSource: null, fallbackMessage: null });
       }
-      return NextResponse.json({ available: true, text, aiGenerated: true, singleLanguageSource: null, fallbackMessage: null });
+
+      const localText = composeLocalReading({ card: payload.card, question: payload.question, lang });
+      if (localText) {
+        return NextResponse.json({ available: true, text: localText, aiGenerated: false, localFallback: true, singleLanguageSource: null, fallbackMessage: null });
+      }
+
+      // Only reachable if even the Universe Message file were missing text
+      // for this card — verified elsewhere that it never is, but this is
+      // the honest last resort rather than a crash.
+      return NextResponse.json({ available: false, text: null, fallbackMessage: UNAVAILABLE_MESSAGE[lang] || UNAVAILABLE_MESSAGE.hinglish });
     }
 
     const topic = TOPICS.find((t) => t.id === payload.topicId);
