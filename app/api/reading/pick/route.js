@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionUser, summarizeAccess, createPickToken } from "@/lib/auth";
@@ -41,7 +42,7 @@ export async function POST(req) {
 
   try {
     const subscribed = !!(user.subscriptionExpires && new Date(user.subscriptionExpires) > new Date());
-    const hasAccess = subscribed || user.readingsUsed < 3;
+    const hasAccess = subscribed || user.readingsUsed < 3 + (user.bonusReadings || 0);
 
     if (!hasAccess) {
       return NextResponse.json(
@@ -75,6 +76,7 @@ export async function POST(req) {
     });
   } catch (err) {
     console.error("Pick failed:", err);
+    Sentry.captureException(err, { tags: { area: "reading-pick" } });
     return NextResponse.json({ error: "Couldn't draw a card right now. Please try again." }, { status: 500 });
   }
 }

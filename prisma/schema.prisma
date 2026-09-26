@@ -27,6 +27,22 @@ model User {
   createdAt           DateTime      @default(now())
   orders              Order[]
   chatMessages        ChatMessage[]
+
+  // Referrals — see REFERRAL_BONUS_READINGS in lib/auth.js and the reward
+  // logic in app/api/verify-payment/route.js. referralCode is this user's
+  // own shareable code (generated once at signup, lib/referral.js);
+  // referredByUserId records who referred *them*, set at their own signup
+  // if they arrived via someone else's link. bonusReadings adds on top of
+  // FREE_READING_LIMIT rather than resetting it, so it stacks cleanly
+  // across multiple referrals and doesn't interfere with normal usage
+  // tracking. referralRewarded ensures the bonus is only ever granted once
+  // per referred user, on their first subscription, not every renewal.
+  referralCode     String  @unique
+  referredByUserId String?
+  referredBy       User?   @relation("Referrals", fields: [referredByUserId], references: [id])
+  referredUsers    User[]  @relation("Referrals")
+  bonusReadings    Int     @default(0)
+  referralRewarded Boolean @default(false)
 }
 
 // Persisted chat history, per account — only the last ~30 messages are

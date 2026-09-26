@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
@@ -58,6 +59,7 @@ export async function POST(req) {
     return NextResponse.json({ id: saved.id });
   } catch (err) {
     console.error("Chat message save failed:", err);
+    Sentry.captureException(err, { tags: { area: "chat-messages" } });
     // Fail soft — this session's chat keeps working locally either way;
     // one message just doesn't make it into next time's history.
     return NextResponse.json({ id: null });

@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { DECK, TOPICS } from "@/lib/topics";
+import { DECK, TOPICS, cardSlug } from "@/lib/topics";
 import { shuffle } from "@/lib/parseReading";
 import { getGreeting, getClosing } from "@/lib/ginni";
 import { classifyQuestion, looksNonLatinScript, isOffTopicChitchat } from "@/lib/classify";
+import { buildShareImage, shareOrDownloadImage } from "@/lib/shareImage";
 import DrawOverlay from "./DrawOverlay";
 import RevealCard from "./RevealCard";
 import Paywall from "./Paywall";
@@ -105,6 +106,12 @@ export default function ChatPanel({
   // language-toggle click re-fetches the same reveal (see RevealCard.jsx)
   // and would otherwise re-persist a duplicate row every time.
   const persistedRevealIds = useRef(new Set());
+  // Tracks which free follow-ups ("tell me more" / "deeper meaning") have
+  // already been used per reveal message, as `${msgId}:${kind}` — purely
+  // to stop the same button being clicked repeatedly into duplicate
+  // messages; resets on reload, which is fine since re-showing the same
+  // free content again is harmless either way.
+  const [usedFollowups, setUsedFollowups] = useState(() => new Set());
   useEffect(() => { busyRef.current = busy; }, [busy]);
   useEffect(() => { activeDrawRef.current = activeDraw; }, [activeDraw]);
 
@@ -220,11 +227,35 @@ export default function ChatPanel({
   // Called by RevealCard the first time a reveal actually resolves to real
   // text — this is where the finished reading gets saved, with the text
   // already baked in (the pick token itself is never stored; it expires in
-  // 20 minutes and history needs to outlive that).
+  // 20 minutes and history needs to outlive that). Also records the text
+  // on the message itself so the Share button (see ChatBubble) has the
+  // finished reading to work with, not just a still-loading RevealCard.
   function handleRevealResolved(msgId, card, aiMode, text) {
+    setMessages((m) => m.map((msg) => (msg.id === msgId ? { ...msg, resolvedText: text } : msg)));
     if (persistedRevealIds.current.has(msgId)) return;
     persistedRevealIds.current.add(msgId);
     persistMessage({ role: "ginni", kind: "reveal", text, card, aiMode });
+  }
+
+  // Free, unlimited elaboration on a card already revealed — no new draw,
+  // no credit spent (see app/api/reading/followup/route.js). msgId+kind
+  // together identify which button was clicked, purely to disable it
+  // after use (see usedFollowups above).
+  async function handleFollowup(msgId, card, kind) {
+    const key = `${msgId}:${kind}`;
+    if (usedFollowups.has(key)) return;
+    setUsedFollowups((s) => new Set(s).add(key));
+
+    try {
+      const res = await fetch(`/api/reading/followup?card=${encodeURIComponent(card)}&kind=${kind}&lang=${encodeURIComponent(lang)}`);
+      const data = await res.json();
+      const text = data.available ? data.text : data.fallbackMessage || GENERIC_ERROR[lang] || GENERIC_ERROR.hinglish;
+      setMessages((m) => [...m, { id: nextId(), role: "ginni", kind: "text", text }]);
+      persistMessage({ role: "ginni", kind: "text", text });
+    } catch {
+      const text = NETWORK_ERROR[lang] || NETWORK_ERROR.hinglish;
+      setMessages((m) => [...m, { id: nextId(), role: "ginni", kind: "text", text }]);
+    }
   }
 
   async function handlePick(cardName) {
@@ -289,7 +320,16 @@ export default function ChatPanel({
             <div className="chat-bubble ginni">Aapki purani baatein la rahi hoon…</div>
           </div>
         ) : (
-          messages.map((msg) => <ChatBubble key={msg.id} msg={msg} lang={lang} onRevealResolved={handleRevealResolved} />)
+          messages.map((msg) => (
+            <ChatBubble
+              key={msg.id}
+              msg={msg}
+              lang={lang}
+              onRevealResolved={handleRevealResolved}
+              onFollowup={handleFollowup}
+              usedFollowups={usedFollowups}
+            />
+          ))
         )}
         <div ref={endRef} />
       </div>
@@ -352,7 +392,13 @@ export default function ChatPanel({
   );
 }
 
-function ChatBubble({ msg, lang, onRevealResolved }) {
+const FOLLOWUP_LABELS = {
+  hinglish: { universe: "🌙 Aur samjhaiye", spiritual: "✨ Deeper meaning" },
+  english: { universe: "🌙 Tell me more", spiritual: "✨ Deeper meaning" },
+  hindi: { universe: "🌙 और समझाइए", spiritual: "✨ गहरा अर्थ" },
+};
+
+function ChatBubble({ msg, lang, onRevealResolved, onFollowup, usedFollowups }) {
   if (msg.role === "user") {
     return (
       <div className="chat-row user">
@@ -362,6 +408,7 @@ function ChatBubble({ msg, lang, onRevealResolved }) {
   }
 
   if (msg.kind === "reveal") {
+    const labels = FOLLOWUP_LABELS[lang] || FOLLOWUP_LABELS.hinglish;
     return (
       <div className="chat-row ginni">
         <div className="chat-bubble ginni chat-bubble--reveal">
@@ -375,6 +422,23 @@ function ChatBubble({ msg, lang, onRevealResolved }) {
             resolvedText={msg.resolvedText}
             onResolved={msg.resolvedText ? undefined : (text) => onRevealResolved(msg.id, msg.card, msg.aiMode, text)}
           />
+          <div className="reveal-followup-row">
+            {["universe", "spiritual"].map((kind) => {
+              const used = usedFollowups.has(`${msg.id}:${kind}`);
+              return (
+                <button
+                  key={kind}
+                  type="button"
+                  className="reveal-followup-btn"
+                  disabled={used}
+                  onClick={() => onFollowup(msg.id, msg.card, kind)}
+                >
+                  {labels[kind]}
+                </button>
+              );
+            })}
+            {msg.resolvedText && <ShareButton card={msg.card} text={msg.resolvedText} />}
+          </div>
         </div>
       </div>
     );
@@ -384,5 +448,33 @@ function ChatBubble({ msg, lang, onRevealResolved }) {
     <div className="chat-row ginni">
       <div className="chat-bubble ginni">{msg.text}</div>
     </div>
+  );
+}
+
+// Builds and shares/downloads a card image entirely client-side — see
+// lib/shareImage.js. Its own tiny loading state, local to this one button,
+// since generating the image takes a moment (loading the card art, drawing
+// wrapped text) and nothing else in the bubble needs to know about it.
+function ShareButton({ card, text }) {
+  const [busy, setBusy] = useState(false);
+
+  async function handleShare() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const blob = await buildShareImage({ cardSrc: `/cards/${cardSlug(card)}.png`, cardName: card, text });
+      if (blob) await shareOrDownloadImage(blob, `ginni-${cardSlug(card)}.png`);
+    } catch {
+      // Sharing/downloading is a nice-to-have on top of a reading that's
+      // already fully shown in the chat — a failure here is silent rather
+      // than interrupting the conversation with an error bubble.
+    }
+    setBusy(false);
+  }
+
+  return (
+    <button type="button" className="reveal-followup-btn" disabled={busy} onClick={handleShare}>
+      {busy ? "…" : "📤 Share this card"}
+    </button>
   );
 }

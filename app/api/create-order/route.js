@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import Razorpay from "razorpay";
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
@@ -52,6 +53,7 @@ export async function POST() {
     });
   } catch (err) {
     console.error("Razorpay order creation failed:", err);
+    Sentry.captureException(err, { tags: { area: "create-order" } });
     return NextResponse.json({ error: "Could not create order." }, { status: 500 });
   }
 }

@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
@@ -25,6 +26,7 @@ export async function GET() {
     return NextResponse.json({ messages: recent.reverse() });
   } catch (err) {
     console.error("Chat history load failed:", err);
+    Sentry.captureException(err, { tags: { area: "chat-history" } });
     // Fail soft — an empty history (just today's fresh chat) beats blocking
     // the whole app from loading because of one flaky query.
     return NextResponse.json({ messages: [] });

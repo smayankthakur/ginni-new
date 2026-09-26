@@ -284,3 +284,73 @@ NOT caught). The broadened keyword rules tested against several previously
 all now match correctly. The local fallback composer tested end-to-end
 against real data and produces a genuine, well-formed reading. `next
 build` compiles (same pre-existing, unrelated Prisma sandbox limit).
+---
+
+## Update: content gap, follow-ups, sharing, referrals, dead code, error tracking
+
+The big one — six items in one pass, per your go-ahead on all of them.
+
+**1. New Career topic (16th question).** `data/career_guidance.json` — real,
+hand-written Hinglish content for all 78 cards (job, promotion, business,
+interview questions all route here now via broadened `lib/classify.js`
+rules). Hinglish-only for this pass; English/Hindi can be added later using
+the same `Hinglish:`/`English:`/`HINDI:` label format as the original 13
+files — no code changes needed when you do, it just needs those sections
+added to the JSON. Wired into `lib/topics.js`, `lib/readings.js`, and
+automatically picked up by the AI fallback's reference set and the
+sidebar (both render from `TOPICS`, nothing hardcoded to 15).
+
+**2. Free follow-up questions on the same card.** Every reveal now shows
+two small buttons — "Aur samjhaiye" and "Deeper meaning" — that pull *more
+of this app's own existing content* for the same drawn card (Universe
+Message and Spiritual Journey, chosen specifically because they're
+broadly-relevant regardless of what the original question was about) as a
+new Ginni message. No new card, no credit spent
+(`app/api/reading/followup/route.js`, new).
+
+**3. Shareable reading cards.** A "Share this card" button builds a
+1080×1350 PNG (card art + reading text + branding) entirely in the browser
+via canvas — `lib/shareImage.js`, new, zero server cost. Opens the native
+share sheet on mobile (falls back to a direct download if unsupported).
+
+**4. Referrals — 3 free readings for both sides.** Every account gets a
+shareable link (`yoursite.com/?ref=CODE`) via "Invite a friend" in the
+sidebar. The reward only fires once, when the referred friend's *first*
+subscription is verified — not on signup alone, and not on renewals. Full
+detail in the README's new "Referrals" section under the payment module.
+**Needs a new migration** — see below.
+
+**5. Dead code removed.** `components/ReadingPanel.jsx` — fully unused
+since the chat merge, and the one file quietly failing lint every round
+since. Gone.
+
+**6. Error tracking (Sentry, optional).** Set `SENTRY_DSN` and/or
+`NEXT_PUBLIC_SENTRY_DSN` to get real error reports. Beyond Next.js's own
+instrumentation, every catch block that's actually caused a real bug in
+this app now also calls `Sentry.captureException()` explicitly —
+`getSessionUser`, both auth routes, pick, reveal, both chat routes, both
+payment routes. This is what would have turned the whole pgbouncer/login
+investigation into a five-minute lookup. Unset by default, zero cost,
+zero risk either way.
+
+**New migration required** — `prisma/migrations/20260922100000_add_referrals/`
+adds `referralCode`, `referredByUserId`, `bonusReadings`, and
+`referralRewarded` to `User`. Run its SQL once in Supabase's SQL Editor (or
+via `prisma migrate deploy`) the same way as the chat-history migration
+earlier. It correctly backfills a real unique code for your existing
+accounts before locking the column to `NOT NULL UNIQUE` — safe to run with
+your data already in place.
+
+**On the foundation:** still exactly where we left it — waiting on you to
+re-edit `DATABASE_URL` directly in Vercel and confirm via
+`/api/debug/db-config` that `hasPgbouncerParam` shows `"true"` before
+testing login again. Nothing in this round touches that.
+
+Re-verified: `eslint` clean across every changed file (zero errors,
+one pre-existing unrelated warning in `app/layout.js` about font loading).
+`next build` compiles (same pre-existing, unrelated Prisma sandbox limit
+as always). All 16 topics round-trip through the classifier, including the
+new Career one. Career readings validated: all 78 cards present, all parse
+correctly, graceful English/Hindi fallback confirmed. Follow-up and share
+features are new client-side interactions with no server-state risk to
+anything existing.

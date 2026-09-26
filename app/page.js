@@ -63,6 +63,7 @@ export default function Home() {
               setActiveTopic(null);
             }}
             onLogout={handleLogout}
+            referralCode={me.referralCode}
           />
           <main className="main chat-mode">
             <div className="main-inner chat-main-inner">

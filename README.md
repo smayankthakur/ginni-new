@@ -117,6 +117,25 @@ ALTER TABLE "ChatMessage" ADD CONSTRAINT "ChatMessage_userId_fkey" FOREIGN KEY (
 
 This is the same SQL as `prisma/migrations/20260921090000_add_chat_messages/migration.sql` — that file exists so `npx prisma migrate deploy` picks it up too if you ever run migrations that way instead.
 
+## Error tracking (optional)
+
+Set `SENTRY_DSN` (server errors) and/or `NEXT_PUBLIC_SENTRY_DSN` (browser
+errors — same DSN value works for both, Sentry DSNs are safe to expose
+client-side) to get real error reports instead of only Vercel's raw logs.
+Sign up free at sentry.io, create a Next.js project, copy its DSN. Unset
+by default — nothing about the build or runtime changes if you skip this.
+
+Beyond Next.js's own automatic instrumentation (which has a known gap
+under Turbopack for route handlers specifically — see
+`sentry.server.config.js`'s comment), every catch block that's actually
+been the source of a real bug in this app also calls
+`Sentry.captureException()` explicitly: `lib/auth.js`'s `getSessionUser`,
+both auth routes, `/api/reading/pick`, `/api/reveal`, both chat routes,
+and the payment routes. That's deliberate — it's what would have turned
+the pgbouncer/login investigation earlier in this project into a five-
+minute Sentry lookup instead of many rounds of manually hunting through
+Vercel's logs.
+
 ## Accounts & server-side enforcement
 
 Every visitor now needs an account (email + password) before they can do
@@ -252,22 +271,47 @@ a subscription is granted. The two honest limitations (30-day unlock
 instead of true auto-billing, and no rate limiting on signups yet) are also
 listed there.
 
+### Referrals — 3 free readings for both sides
+
+Every account gets a unique `referralCode` (generated at signup,
+`lib/referral.js`) and a shareable link in the form `yoursite.com/?ref=CODE`
+— visible via "Invite a friend" in the sidebar (`InviteModal.jsx`). When
+someone signs up through that link, their `referredByUserId` is recorded
+(`app/api/auth/signup/route.js`); an unrecognized or missing code is never
+an error, signup just proceeds without crediting anyone.
+
+The reward — `REFERRAL_BONUS_READINGS` (3, `lib/auth.js`) for **both** the
+referrer and the new subscriber — is only granted once, at the moment the
+referred friend's *first* subscription payment is verified
+(`app/api/verify-payment/route.js`), guarded by a `referralRewarded` flag so
+it can never fire again on a renewal. Signing up alone doesn't trigger
+anything — matching "when a friend... subscribes," not just registers.
+
+`bonusReadings` adds on top of the normal 3-free-reading limit rather than
+resetting it (`lib/auth.js`'s `summarizeAccess`, and the same check in
+`/api/reading/pick`), so it stacks cleanly across multiple referrals and
+never interferes with a user's actual usage count.
+
 ## Language parsing
 
 `lib/parseReading.js` recognises every language-label style found across the
-13 source files — inline colon labels (`Hinglish:`, `English:`, `HINDI:`,
-`Devanagari Hinglish:`, common misspellings like `Hinid:`/`HINDIN:`), and
-whole-line labels with no colon (`ENGLISH`, `हिंदी`, etc.). For a handful of
-cards that stacked all three languages back-to-back with no labels at all,
-it splits them by detecting Devanagari vs. Latin script rather than relying
-on wording. As of the last content pass, every card in every one of the 15
-questions resolves to real text in all three languages — verified by running
-the parser against every file, not by inspection.
+original 13 source files — inline colon labels (`Hinglish:`, `English:`,
+`HINDI:`, `Devanagari Hinglish:`, common misspellings like
+`Hinid:`/`HINDIN:`), and whole-line labels with no colon (`ENGLISH`,
+`हिंदी`, etc.). For a handful of cards that stacked all three languages
+back-to-back with no labels at all, it splits them by detecting Devanagari
+vs. Latin script rather than relying on wording. As of that content pass,
+every card in every one of those 15 questions resolves to real text in all
+three languages — verified by running the parser against every file, not
+by inspection. The newer 16th topic, Career (`data/career_guidance.json`),
+is Hinglish-only for now — it uses the same graceful single-language
+fallback several original cards already relied on (see
+`SINGLE_LANG_NOTE` in `RevealCard.jsx`), rather than a special case.
 
 ## AI fallback for unmatched/non-Hinglish questions
 
 `lib/classify.js`'s free keyword matcher is the first and only pass for
-anything typed in Hinglish/English/Hindi that maps cleanly to one of the 15
+anything typed in Hinglish/English/Hindi that maps cleanly to one of the 16
 topics — no AI, no cost. It only hands off further in two cases: the
 question doesn't match any of the 15 topics' keyword rules, or
 `looksNonLatinScript()` flags the text as mostly outside the Latin-alphabet

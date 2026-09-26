@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { verifyPickToken } from "@/lib/auth";
 import { TOPICS, UNAVAILABLE_MESSAGE } from "@/lib/topics";
@@ -68,6 +69,7 @@ export async function GET(req) {
     });
   } catch (err) {
     console.error("Reveal failed:", err);
+    Sentry.captureException(err, { tags: { area: "reveal" } });
     return NextResponse.json({ error: "Couldn't load this reading right now." }, { status: 500 });
   }
 }
