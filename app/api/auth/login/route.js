@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyPassword, setSessionCookie, summarizeAccess } from "@/lib/auth";
@@ -37,6 +38,7 @@ export async function POST(req) {
     return NextResponse.json(summarizeAccess(user));
   } catch (err) {
     console.error("Login failed:", err);
+    Sentry.captureException(err, { tags: { area: "login" } });
     return NextResponse.json(
       { error: "Couldn't log you in right now. Please try again in a moment." },
       { status: 500 }

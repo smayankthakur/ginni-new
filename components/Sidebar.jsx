@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { TOPICS, LANG_LABEL } from "@/lib/topics";
+import InviteModal from "./InviteModal";
 
 const LANGS = [
   { key: "hinglish", label: "मिली" },
@@ -9,8 +10,9 @@ const LANGS = [
   { key: "hindi", label: "हिं" },
 ];
 
-export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onChangeLang, onRestart, onLogout }) {
+export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onChangeLang, onRestart, onLogout, referralCode }) {
   const [panelOpen, setPanelOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   return (
     <>
@@ -68,6 +70,9 @@ export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onCh
             </div>
           </div>
         )}
+        <button className="restart-link" onClick={() => setInviteOpen(true)}>
+          Invite a friend
+        </button>
         <button className="restart-link" onClick={onRestart}>
           Start over
         </button>
@@ -128,10 +133,13 @@ export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onCh
         <div className="sidebar-footer">
           Each spread is shuffled fresh. Pick with an open mind — the card that calls to you is the
           one meant for you.
+          <button onClick={() => setInviteOpen(true)}>Invite a friend</button>
           <button onClick={onRestart}>Start over</button>
           {onLogout && <button onClick={onLogout}>Log out</button>}
         </div>
       </aside>
+
+      {inviteOpen && <InviteModal referralCode={referralCode} onClose={() => setInviteOpen(false)} />}
     </>
   );
 }

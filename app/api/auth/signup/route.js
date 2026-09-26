@@ -1,7 +1,9 @@
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { hashPassword, setSessionCookie, summarizeAccess } from "@/lib/auth";
 import { withRetry } from "@/lib/withRetry";
+import { generateUniqueReferralCode } from "@/lib/referral";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -19,7 +21,7 @@ export async function POST(req) {
     );
   }
 
-  const { email, password, name } = await req.json().catch(() => ({}));
+  const { email, password, name, referralCode } = await req.json().catch(() => ({}));
 
   if (!email || !EMAIL_RE.test(email)) {
     return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
@@ -36,10 +38,28 @@ export async function POST(req) {
       return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
     }
 
+    // A referral code arriving here just means "someone's link was used" —
+    // an unrecognized or missing code is never an error, signup proceeds
+    // exactly the same either way, just without crediting a referrer.
+    let referredByUserId = null;
+    if (referralCode) {
+      const referrer = await withRetry(() =>
+        prisma.user.findUnique({ where: { referralCode: String(referralCode).trim().toUpperCase() }, select: { id: true } })
+      );
+      referredByUserId = referrer?.id || null;
+    }
+
     const passwordHash = await hashPassword(password);
+    const newReferralCode = await generateUniqueReferralCode();
     const user = await withRetry(() =>
       prisma.user.create({
-        data: { email: normalizedEmail, passwordHash, name: name?.trim() || null },
+        data: {
+          email: normalizedEmail,
+          passwordHash,
+          name: name?.trim() || null,
+          referralCode: newReferralCode,
+          referredByUserId,
+        },
       })
     );
 
@@ -48,6 +68,7 @@ export async function POST(req) {
     return NextResponse.json(summarizeAccess(user));
   } catch (err) {
     console.error("Signup failed:", err);
+    Sentry.captureException(err, { tags: { area: "signup" } });
     return NextResponse.json(
       { error: "Couldn't create your account right now. Please try again in a moment." },
       { status: 500 }

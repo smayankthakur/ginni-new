@@ -15,10 +15,18 @@ export default function AuthGate({ onAuthed }) {
     setError(null);
     setLoading(true);
     try {
+      // A referral link looks like yoursite.com/?ref=CODE — an unrecognized
+      // or absent code is never an error, the server just signs them up
+      // without crediting anyone (see app/api/auth/signup/route.js).
+      const referralCode =
+        mode === "signup" && typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("ref")
+          : null;
+
       const res = await fetch(`/api/auth/${mode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(mode === "signup" ? { email, password, name } : { email, password }),
+        body: JSON.stringify(mode === "signup" ? { email, password, name, referralCode } : { email, password }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong.");

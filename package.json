@@ -17,6 +17,7 @@
     "@anthropic-ai/sdk": "^0.127.0",
     "@google/genai": "^2.23.0",
     "@prisma/client": "6.19.3",
+    "@sentry/nextjs": "^10.75.2",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
     "next": "16.3.0",

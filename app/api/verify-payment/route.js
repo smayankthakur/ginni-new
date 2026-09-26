@@ -1,6 +1,7 @@
+import * as Sentry from "@sentry/nextjs";
 import crypto from "crypto";
 import { NextResponse } from "next/server";
-import { getSessionUser, summarizeAccess } from "@/lib/auth";
+import { getSessionUser, summarizeAccess, REFERRAL_BONUS_READINGS } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -54,14 +55,36 @@ export async function POST(req) {
         : new Date();
     const newExpiry = new Date(base.getTime() + THIRTY_DAYS_MS);
 
-    const [, updatedUser] = await prisma.$transaction([
+    // Referral reward — only ever once per referred user, on their first
+    // subscription (referralRewarded guards against it firing again on a
+    // renewal), and only if they actually signed up via someone's link.
+    const rewardReferral = !!user.referredByUserId && !user.referralRewarded;
+
+    const transactionOps = [
       prisma.order.update({ where: { id: order.id }, data: { status: "paid" } }),
-      prisma.user.update({ where: { id: user.id }, data: { subscriptionExpires: newExpiry } }),
-    ]);
+      prisma.user.update({
+        where: { id: user.id },
+        data: {
+          subscriptionExpires: newExpiry,
+          ...(rewardReferral ? { bonusReadings: { increment: REFERRAL_BONUS_READINGS }, referralRewarded: true } : {}),
+        },
+      }),
+    ];
+    if (rewardReferral) {
+      transactionOps.push(
+        prisma.user.update({
+          where: { id: user.referredByUserId },
+          data: { bonusReadings: { increment: REFERRAL_BONUS_READINGS } },
+        })
+      );
+    }
+
+    const [, updatedUser] = await prisma.$transaction(transactionOps);
 
     return NextResponse.json({ verified: true, access: summarizeAccess(updatedUser) });
   } catch (err) {
     console.error("Payment verification failed:", err);
+    Sentry.captureException(err, { tags: { area: "verify-payment" } });
     return NextResponse.json(
       { error: "Payment succeeded but we couldn't confirm it just now. Contact support with your payment ID." },
       { status: 500 }
