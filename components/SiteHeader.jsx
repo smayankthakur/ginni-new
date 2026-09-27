@@ -94,7 +94,19 @@ export default function SiteHeader() {
   }, [open]);
 
   return (
-    <header className={"site-header" + (scrolled ? " is-scrolled" : "")}>
+    <header
+      className={
+        "site-header" +
+        (scrolled ? " is-scrolled" : "") +
+        // .site-mobile-panel renders as an absolutely-positioned child of
+        // this header, starting at top:100% — i.e. entirely below the
+        // header's own box. overflow:hidden (needed for the height-collapse
+        // transition above) clips it into invisibility whenever it's open.
+        // The header is always forced to full height while open anyway, so
+        // there's no downside to lifting the clip at the same time.
+        (open ? " menu-open" : "")
+      }
+    >
       <div className="site-header-inner">
         <a className="site-brand" href={MAIN_SITE} aria-label="The Divine Tarot — home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
