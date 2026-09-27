@@ -16,9 +16,25 @@ export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onCh
   const [drawerOpen, setDrawerOpen] = useState(false);
   const activeTopic = TOPICS.find((t) => t.id === activeTopicId) || null;
 
+  // aria-hidden gets applied to .topic-drawer the instant drawerOpen flips
+  // false. If the close button (or anything else inside the drawer) still
+  // holds focus at that moment, the browser logs an aria-hidden/focus
+  // conflict and screen-reader users are left with focus stuck inside a
+  // now-hidden region. Blur whatever's focused inside the drawer first, so
+  // it's never aria-hidden while focused.
+  function closeDrawer() {
+    if (
+      document.activeElement &&
+      document.activeElement.closest?.(".topic-drawer")
+    ) {
+      document.activeElement.blur();
+    }
+    setDrawerOpen(false);
+  }
+
   function pickFromDrawer(t) {
     onSelectTopic(t);
-    setDrawerOpen(false);
+    closeDrawer();
   }
 
   return (
@@ -59,7 +75,7 @@ export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onCh
       </button>
 
       {drawerOpen && (
-        <div className="topic-drawer-backdrop mobile-only" onClick={() => setDrawerOpen(false)} />
+        <div className="topic-drawer-backdrop mobile-only" onClick={closeDrawer} />
       )}
       <div
         className={"topic-drawer mobile-only" + (drawerOpen ? " open" : "")}
@@ -73,7 +89,7 @@ export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onCh
             type="button"
             className="topic-drawer-close"
             aria-label="Close"
-            onClick={() => setDrawerOpen(false)}
+            onClick={closeDrawer}
           >
             ×
           </button>

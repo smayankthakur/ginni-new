@@ -46,36 +46,44 @@ export default function SiteHeader() {
   // question-trigger stack directly under this header (see .site-page rules
   // in globals.css, which all key off --site-header-h). On a phone that's
   // three sticky bars before any actual content, so once the person starts
-  // scrolling this header collapses out of the way (scrolling down) and
-  // reappears when they scroll back up — same pattern as most mobile nav
-  // bars. Desktop is untouched: this never runs above 820px, and the panel
-  // menu (`open`) always forces the header back open so its links stay
-  // reachable.
+  // scrolling this header shrinks to a compact bar (scrolling down) and
+  // returns to full size when they scroll back up.
+  //
+  // Deliberately shrinks to 48px, never to 0 — a 0-height element can't be
+  // tapped at all, so if this ever got stuck "collapsed" (momentum
+  // scrolling firing an odd sequence of deltas is common on mobile), the
+  // logo and hamburger would disappear with no way to bring them back
+  // except scrolling back up, which reads as "the header stopped
+  // responding." Staying at 48px keeps both visible and tappable no matter
+  // what state this logic ends up in. Desktop is untouched: this never
+  // runs above 820px, and the panel menu (`open`) always forces the header
+  // back to full size so its links stay reachable.
   const lastYRef = useRef(0);
   useEffect(() => {
     const root = document.documentElement;
-    const setCollapsed = (collapsed) => {
-      root.style.setProperty("--site-header-h", collapsed ? "0px" : "80px");
+    const setCompact = (compact) => {
+      root.style.setProperty("--site-header-h", compact ? "48px" : "80px");
     };
     const onScroll = () => {
       if (window.innerWidth > 820 || open) {
-        setCollapsed(false);
+        setCompact(false);
         lastYRef.current = window.scrollY;
         return;
       }
       const y = window.scrollY;
       const delta = y - lastYRef.current;
       if (y < 40) {
-        setCollapsed(false);
+        setCompact(false);
       } else if (delta > 6) {
-        setCollapsed(true);
+        setCompact(true);
       } else if (delta < -6) {
-        setCollapsed(false);
+        setCompact(false);
       }
       lastYRef.current = y;
     };
-    onScroll(); // run once immediately — forces the header back open right
-                // away when `open` flips true, without waiting for a scroll
+    onScroll(); // run once immediately — forces the header back to full
+                // size right away when `open` flips true, without waiting
+                // for a scroll
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
     return () => {
