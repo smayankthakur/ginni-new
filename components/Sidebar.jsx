@@ -13,6 +13,13 @@ const LANGS = [
 export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onChangeLang, onRestart, onLogout, referralCode }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const activeTopic = TOPICS.find((t) => t.id === activeTopicId) || null;
+
+  function pickFromDrawer(t) {
+    onSelectTopic(t);
+    setDrawerOpen(false);
+  }
 
   return (
     <>
@@ -32,19 +39,62 @@ export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onCh
         </button>
       </div>
 
-      {/* Mobile chip bar — every question is visible via horizontal swipe, nothing is hidden in a menu */}
-      <div className="chip-bar" role="tablist" aria-label="Choose a question">
-        {TOPICS.map((t) => (
+      {/* Mobile question trigger — replaces the old always-visible chip strip.
+          Opens the same numbered topic-list markup the desktop sidebar uses
+          (topic-num / topic-title / topic-meta) in a full-screen drawer, so
+          nothing is truncated or hidden behind horizontal scroll anymore,
+          and it collapses back to one slim row instead of permanently
+          occupying its own sticky strip. */}
+      <button
+        type="button"
+        className="question-trigger"
+        aria-haspopup="dialog"
+        aria-expanded={drawerOpen}
+        onClick={() => setDrawerOpen(true)}
+      >
+        <span className="question-trigger-label">
+          {activeTopic ? activeTopic.title : "Choose a question"}
+        </span>
+        <span className="question-trigger-chevron" aria-hidden="true">▾</span>
+      </button>
+
+      {drawerOpen && (
+        <div className="topic-drawer-backdrop mobile-only" onClick={() => setDrawerOpen(false)} />
+      )}
+      <div
+        className={"topic-drawer mobile-only" + (drawerOpen ? " open" : "")}
+        role="dialog"
+        aria-label="Choose a question"
+        aria-hidden={!drawerOpen}
+      >
+        <div className="topic-drawer-header">
+          <span>Choose a question</span>
           <button
-            key={t.id}
-            role="tab"
-            aria-selected={activeTopicId === t.id}
-            className={"chip" + (activeTopicId === t.id ? " active" : "")}
-            onClick={() => onSelectTopic(t)}
+            type="button"
+            className="topic-drawer-close"
+            aria-label="Close"
+            onClick={() => setDrawerOpen(false)}
           >
-            {t.title}
+            ×
           </button>
-        ))}
+        </div>
+        <ul className="topic-list topic-list--drawer">
+          {TOPICS.map((t) => (
+            <li
+              key={t.id}
+              className={"topic-item" + (activeTopicId === t.id ? " selected" : "")}
+              onClick={() => pickFromDrawer(t)}
+            >
+              <span className="topic-num">{String(t.id).padStart(2, "0")}</span>
+              <span className="topic-text">
+                <span className="topic-title">{t.title}</span>
+                <span className="topic-meta">
+                  {t.cards} card{t.cards > 1 ? "s" : ""}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
 
       {panelOpen && <div className="sidebar-backdrop mobile-only" onClick={() => setPanelOpen(false)} />}

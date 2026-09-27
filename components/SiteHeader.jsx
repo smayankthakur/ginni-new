@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // Ginni Ki Baatein lives on its own subdomain and doesn't have /about,
 // /kundli-milan, or /privacy routes of its own — those pages live on the
@@ -41,6 +41,49 @@ export default function SiteHeader() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  // Mobile only: below 820px, the reading app's own mobile-topbar and
+  // question-trigger stack directly under this header (see .site-page rules
+  // in globals.css, which all key off --site-header-h). On a phone that's
+  // three sticky bars before any actual content, so once the person starts
+  // scrolling this header collapses out of the way (scrolling down) and
+  // reappears when they scroll back up — same pattern as most mobile nav
+  // bars. Desktop is untouched: this never runs above 820px, and the panel
+  // menu (`open`) always forces the header back open so its links stay
+  // reachable.
+  const lastYRef = useRef(0);
+  useEffect(() => {
+    const root = document.documentElement;
+    const setCollapsed = (collapsed) => {
+      root.style.setProperty("--site-header-h", collapsed ? "0px" : "80px");
+    };
+    const onScroll = () => {
+      if (window.innerWidth > 820 || open) {
+        setCollapsed(false);
+        lastYRef.current = window.scrollY;
+        return;
+      }
+      const y = window.scrollY;
+      const delta = y - lastYRef.current;
+      if (y < 40) {
+        setCollapsed(false);
+      } else if (delta > 6) {
+        setCollapsed(true);
+      } else if (delta < -6) {
+        setCollapsed(false);
+      }
+      lastYRef.current = y;
+    };
+    onScroll(); // run once immediately — forces the header back open right
+                // away when `open` flips true, without waiting for a scroll
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      root.style.removeProperty("--site-header-h");
+    };
+  }, [open]);
 
   return (
     <header className={"site-header" + (scrolled ? " is-scrolled" : "")}>
