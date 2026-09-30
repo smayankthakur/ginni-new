@@ -6,7 +6,6 @@ import { useState } from "react";
 // Ginni Ki Baatein's own domain, so Quick Links / Privacy point back at
 // the main site instead of using next/link.
 const MAIN_SITE = "https://thedivinetarotonline.com";
-const READING_SITE = "https://reading.thedivinetarotonline.com/";
 
 // Inline SVGs, in the same style as the social icons below — no icon
 // package dependency needed for this project.
@@ -131,7 +130,7 @@ export default function SiteFooter() {
             </div>
           </div>
           <p className="site-footer-desc">
-            Guiding your path with clarity, intuition, and spiritual insight.
+            Clarity for your path. Guidance for your soul.
           </p>
         </div>
 
@@ -141,8 +140,7 @@ export default function SiteFooter() {
           <ul className="site-footer-links">
             {[
               { name: "About", href: `${MAIN_SITE}/about` },
-              { name: "Readings", href: READING_SITE },
-              { name: "Premium", href: `${READING_SITE}?upgrade=1` },
+              { name: "Support", href: "https://support.thedivinetarotonline.com/" },
             ].map((link) => (
               <li key={link.name}>
                 <a href={link.href}>
@@ -172,7 +170,7 @@ export default function SiteFooter() {
             ))}
           </div>
           <a href={`${MAIN_SITE}/privacy`} className="site-footer-privacy-inline">
-            Privacy Policy
+            Privacy
           </a>
         </div>
 
@@ -246,7 +244,7 @@ export default function SiteFooter() {
         <div className="site-footer-bottom-links">
           <a href={`${MAIN_SITE}/privacy`}>Privacy</a>
           <span className="site-footer-divider" />
-          <span>© {year} The Divine Tarot. All rights reserved.</span>
+          <span>{year}</span>
         </div>
       </div>
     </footer>

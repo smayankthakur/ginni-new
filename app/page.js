@@ -14,6 +14,15 @@ export default function Home() {
   const [session, setSession] = useState(null); // {name, lang} — onboarding personalization, separate from auth
   const [activeTopic, setActiveTopic] = useState(null); // highlight only — the chat below is the source of truth
   const [pendingAsk, setPendingAsk] = useState(null); // {text, nonce} — a sidebar click waiting to be sent
+  // Reading language chosen from the site header's EN / हिंदी / Hinglish
+  // toggle. Before a session it seeds onboarding; during one it switches the
+  // live session's language (same as the sidebar / settings chips).
+  const [uiLang, setUiLang] = useState("hinglish");
+  const currentLang = session?.lang || uiLang;
+  function changeLang(next) {
+    setUiLang(next);
+    setSession((prev) => (prev ? { ...prev, lang: next } : prev));
+  }
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -44,12 +53,12 @@ export default function Home() {
 
   return (
     <div className="site-page">
-      <SiteHeader />
+      <SiteHeader lang={currentLang} onChangeLang={changeLang} />
 
       {!me.loggedIn ? (
         <AuthGate onAuthed={setMe} />
       ) : !session ? (
-        <Onboarding defaultName={me.name} onBegin={(name, lang) => setSession({ name, lang })} />
+        <Onboarding defaultName={me.name} defaultLang={uiLang} onBegin={(name, lang) => setSession({ name, lang })} />
       ) : (
         <div id="app" className="active">
           <Sidebar

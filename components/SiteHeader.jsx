@@ -1,13 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
-// Ginni Ki Baatein lives on its own subdomain and doesn't have /about,
-// /kundli-milan, or /privacy routes of its own — those pages live on the
-// main site, so those nav items resolve back to thedivinetarotonline.com,
-// exactly like the real header does (its own "Home" link points at the
-// same absolute URL). Reading, Course, and Personal Reading are each their
-// own subdomain.
+// Header matched 1:1 to thedivinetarotonline.com's own (measured from the
+// live site's markup and computed styles):
+//   - sticky, bg black/60 + blur, 1px white/10 bottom border
+//   - heights 56px (<640) / 64px (640–1023) / 68px (≥1024) — see the
+//     --site-header-h media rules in globals.css
+//   - brand: logo 32/40px, Cinzel 16/18px 600 white, tag Inter 10/11px
+//     uppercase tracking .15em gold/80 (shown at every width)
+//   - ≥1280px (Tailwind xl): centred nav (14px 500 white/70, gold + 2px
+//     underline when current), language toggle pill, red→gold CTA pill
+//   - <1280px: only brand + hamburger; nav, language toggle and CTA live in
+//     a right-side drawer (288px, #0a0a0a, black/50 backdrop) with a "Menu"
+//     header, exactly like the site's
+//   - hides on scroll down, returns on scroll up (the site's
+//     transition-transform behaviour) — instead of the old height shrink.
+//
+// Ginni Ki Baatein lives on its own subdomain and has no /about,
+// /kundli-milan or /privacy of its own, so those resolve to the main site.
 const MAIN_SITE = "https://thedivinetarotonline.com";
 const READING_SITE = "https://reading.thedivinetarotonline.com/";
 
@@ -17,159 +29,143 @@ const NAV_LINKS = [
   { href: READING_SITE, label: "Reading", isExternal: true },
   { href: "https://learn.thedivinetarotonline.com/", label: "Course", isExternal: true },
   { href: `${MAIN_SITE}/kundli-milan`, label: "Kundli Milan" },
-  // { href: "https://booking.thedivinetarotonline.com/", label: "Personal Reading", isExternal: true },
 ];
 
 const CTA_HREF = READING_SITE;
 
-export default function SiteHeader() {
-  const [scrolled, setScrolled] = useState(false);
+// Same three options, same order and labels as the site's toggle. Keys are
+// this app's own language ids (lib/topics.js).
+const LANG_OPTIONS = [
+  { key: "english", label: "EN" },
+  { key: "hindi", label: "हिंदी" },
+  { key: "hinglish", label: "Hinglish" },
+];
+
+function LangToggle({ lang, onChange, className = "" }) {
+  return (
+    <div className={"site-lang " + className} role="group" aria-label="Select language">
+      {LANG_OPTIONS.map((o) => (
+        <button
+          key={o.key}
+          type="button"
+          className={"site-lang-btn" + (lang === o.key ? " active" : "")}
+          aria-pressed={lang === o.key}
+          onClick={() => onChange?.(o.key)}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export default function SiteHeader({ lang = "hinglish", onChangeLang }) {
   const [open, setOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  // Close the mobile panel if the viewport grows past the mobile breakpoint.
-  useEffect(() => {
-    const onResize = () => {
-      if (window.innerWidth > 960) setOpen(false);
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  // Mobile only: below 820px, the reading app's own mobile-topbar and
-  // question-trigger stack directly under this header (see .site-page rules
-  // in globals.css, which all key off --site-header-h). On a phone that's
-  // three sticky bars before any actual content, so once the person starts
-  // scrolling this header shrinks to a compact bar (scrolling down) and
-  // returns to full size when they scroll back up.
-  //
-  // Deliberately shrinks to 48px, never to 0 — a 0-height element can't be
-  // tapped at all, so if this ever got stuck "collapsed" (momentum
-  // scrolling firing an odd sequence of deltas is common on mobile), the
-  // logo and hamburger would disappear with no way to bring them back
-  // except scrolling back up, which reads as "the header stopped
-  // responding." Staying at 48px keeps both visible and tappable no matter
-  // what state this logic ends up in. Desktop is untouched: this never
-  // runs above 820px, and the panel menu (`open`) always forces the header
-  // back to full size so its links stay reachable.
+  // Hide on scroll down / reveal on scroll up, like the main site. Only the
+  // window scroll counts; the chat screen scrolls its own thread, so there
+  // the header simply stays.
   const lastYRef = useRef(0);
   useEffect(() => {
-    const root = document.documentElement;
-    const setCompact = (compact) => {
-      // Full height is 64px on phones (≤820px, matching the mobile default in
-      // globals.css) and 80px on desktop; compact is 48px.
-      const full = window.innerWidth <= 820 ? "64px" : "80px";
-      root.style.setProperty("--site-header-h", compact ? "48px" : full);
-    };
     const onScroll = () => {
-      if (window.innerWidth > 820 || open) {
-        setCompact(false);
-        lastYRef.current = window.scrollY;
-        return;
-      }
       const y = window.scrollY;
       const delta = y - lastYRef.current;
-      if (y < 40) {
-        setCompact(false);
-      } else if (delta > 6) {
-        setCompact(true);
-      } else if (delta < -6) {
-        setCompact(false);
-      }
+      if (open || y < 40) setHidden(false);
+      else if (delta > 8) setHidden(true);
+      else if (delta < -8) setHidden(false);
       lastYRef.current = y;
     };
-    onScroll(); // run once immediately — forces the header back to full
-                // size right away when `open` flips true, without waiting
-                // for a scroll
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [open]);
+
+  // Drawer: lock page scroll + Escape closes.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
     return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      root.style.removeProperty("--site-header-h");
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
     };
   }, [open]);
 
+  const linkProps = (link) =>
+    link.isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {};
+
   return (
-    <header
-      className={
-        "site-header" +
-        (scrolled ? " is-scrolled" : "") +
-        // .site-mobile-panel renders as an absolutely-positioned child of
-        // this header, starting at top:100% — i.e. entirely below the
-        // header's own box. overflow:hidden (needed for the height-collapse
-        // transition above) clips it into invisibility whenever it's open.
-        // The header is always forced to full height while open anyway, so
-        // there's no downside to lifting the clip at the same time.
-        (open ? " menu-open" : "")
-      }
-    >
-      <div className="site-header-inner">
-        <a className="site-brand" href={MAIN_SITE} aria-label="The Divine Tarot — home">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="" className="site-brand-logo" />
-          <span className="site-brand-text">
-            <span className="site-brand-name">The Divine Tarot</span>
-            <span className="site-brand-tag">Premium Tarot Guidance</span>
-          </span>
-        </a>
+    <>
+      <header className={"site-header" + (hidden ? " is-hidden" : "")}>
+        <div className="site-header-inner">
+          <a className="site-brand" href={`${MAIN_SITE}/`} aria-label="The Divine Tarot — home">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="" className="site-brand-logo" />
+            <span className="site-brand-text">
+              <span className="site-brand-name">The Divine Tarot</span>
+              <span className="site-brand-tag">Premium Tarot Guidance</span>
+            </span>
+          </a>
 
-        <nav className="site-nav" aria-label="Primary">
-          {NAV_LINKS.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              target={link.isExternal ? "_blank" : undefined}
-              rel={link.isExternal ? "noopener noreferrer" : undefined}
-            >
-              {link.label}
-            </a>
-          ))}
-        </nav>
-
-        <a className="site-cta" href={CTA_HREF}>
-          Ask your question here
-        </a>
-
-        <button
-          type="button"
-          className={"site-menu-btn" + (open ? " open" : "")}
-          aria-label={open ? "Close menu" : "Open menu"}
-          aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}
-        >
-          <span />
-          <span />
-          <span />
-        </button>
-      </div>
-
-      {open && (
-        <div className="site-mobile-panel">
-          <nav aria-label="Primary">
+          <nav className="site-nav" aria-label="Primary">
             {NAV_LINKS.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                target={link.isExternal ? "_blank" : undefined}
-                rel={link.isExternal ? "noopener noreferrer" : undefined}
-                onClick={() => setOpen(false)}
-              >
+              <a key={link.label} href={link.href} {...linkProps(link)}>
                 {link.label}
               </a>
             ))}
           </nav>
-          <a className="site-cta site-cta-block" href={CTA_HREF} onClick={() => setOpen(false)}>
-            Ask your question here
-          </a>
+
+          <div className="site-header-right">
+            <LangToggle lang={lang} onChange={onChangeLang} className="site-lang--bar" />
+            <a className="site-cta" href={CTA_HREF}>
+              Ask your question here
+            </a>
+            <button
+              type="button"
+              className="site-menu-btn"
+              aria-label="Open menu"
+              aria-expanded={open}
+              onClick={() => setOpen(true)}
+            >
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
         </div>
+      </header>
+
+      {open && typeof document !== "undefined" && createPortal(
+        <>
+          <div className="site-drawer-backdrop" onClick={() => setOpen(false)} />
+          <div className="site-drawer" role="dialog" aria-modal="true" aria-label="Mobile navigation menu">
+            <div className="site-drawer-head">
+              <span className="site-drawer-title">Menu</span>
+              <button type="button" className="site-drawer-close" aria-label="Close menu" onClick={() => setOpen(false)}>
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+            <nav className="site-drawer-nav" aria-label="Primary">
+              {NAV_LINKS.map((link) => (
+                <a key={link.label} href={link.href} {...linkProps(link)} onClick={() => setOpen(false)}>
+                  {link.label}
+                </a>
+              ))}
+              <div className="site-drawer-extra">
+                <LangToggle lang={lang} onChange={onChangeLang} />
+                <a className="site-cta site-cta-block" href={CTA_HREF} onClick={() => setOpen(false)}>
+                  Ask your question here
+                </a>
+              </div>
+            </nav>
+          </div>
+        </>,
+        document.body
       )}
-    </header>
+    </>
   );
 }

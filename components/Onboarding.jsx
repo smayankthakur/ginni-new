@@ -8,9 +8,16 @@ const LANGS = [
   { key: "hindi", native: "हिंदी", label: "Hindi" },
 ];
 
-export default function Onboarding({ onBegin, defaultName }) {
+export default function Onboarding({ onBegin, defaultName, defaultLang }) {
   const [name, setName] = useState(defaultName || "");
-  const [lang, setLang] = useState("hinglish");
+  // The header's EN / हिंदी / Hinglish toggle sets defaultLang; a tap on the
+  // cards below overrides it for this screen. Derived, not synced, so the
+  // header toggle keeps working after a local pick too — the last touched
+  // control wins because page.js resets defaultLang on every header change.
+  const [picked, setPicked] = useState(null);
+  const [pickedFor, setPickedFor] = useState(defaultLang);
+  const lang = pickedFor === defaultLang && picked ? picked : defaultLang || "hinglish";
+  const setLang = (key) => { setPicked(key); setPickedFor(defaultLang); };
 
   return (
     <div id="onboard">
