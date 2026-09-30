@@ -14,11 +14,11 @@ import { MONTHLY_PRICE_INR, startSubscriptionCheckout } from "@/lib/razorpayChec
 
 const INTRO = {
   hinglish: (name) =>
-    `Namaste ${name}! Main Ginni hoon. Apna sawaal type kijiye, ya baayi taraf se koi sawaal chuniye — main samajh kar aapke liye ek card nikaalti hoon.`,
+    `Namaste ${name}! Main Ginni hoon. Apna sawaal type kijiye, ya list mein se koi sawaal chuniye — main samajh kar aapke liye ek card nikaalti hoon.`,
   english: (name) =>
-    `Namaste ${name}! I'm Ginni. Type your question, or pick one from the list on the left — I'll understand it and draw a card for you.`,
+    `Namaste ${name}! I'm Ginni. Type your question, or pick one from the list — I'll understand it and draw a card for you.`,
   hindi: (name) =>
-    `नमस्ते ${name}! मैं जिन्नी हूँ। अपना सवाल टाइप कीजिए, या बायीं तरफ़ से कोई सवाल चुनिए — मैं समझ कर आपके लिए एक कार्ड निकालती हूँ।`,
+    `नमस्ते ${name}! मैं जिन्नी हूँ। अपना सवाल टाइप कीजिए, या सूची में से कोई सवाल चुनिए — मैं समझ कर आपके लिए एक कार्ड निकालती हूँ।`,
 };
 
 // In-character replies for pure small talk (see isOffTopicChitchat in
@@ -82,10 +82,16 @@ const SUBSCRIBE_LABELS = {
   },
 };
 
-// Composer button that opens the mobile question sheet, and the "ask
-// another question" follow-up under every reading (both mobile-only).
-const QUESTIONS_LABEL = { hinglish: "Sawaal", english: "Questions", hindi: "सवाल" };
-const NEW_QUESTION_LABEL = { hinglish: "🔮 Naya sawaal", english: "🔮 New question", hindi: "🔮 नया सवाल" };
+// Quick-reply pills (phones only): every question as a tappable chip under
+// Ginni's latest message — the welcome, and again after each reading — the
+// way food-delivery / support chatbots offer their next options. Tapping
+// one sends it exactly like typing it (page.js -> pendingAsk), so it goes
+// through the same understanding step as everything else.
+const QUICK_LABEL = {
+  hinglish: "Ya inme se koi sawaal chuniye:",
+  english: "Or pick one of these:",
+  hindi: "या इनमें से कोई सवाल चुनिए:",
+};
 
 const GENERIC_ERROR = {
   hinglish: "Kshama kijiye, kuch gadbad ho gayi — thodi der baad phir koshish kijiye.",
@@ -131,7 +137,7 @@ export default function ChatPanel({
   pendingAsk,
   onConsumedAsk,
   onTopicResolved,
-  onOpenQuestions,
+  onPickTopic,
 }) {
   const [messages, setMessages] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -195,9 +201,26 @@ export default function ChatPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const lastGinniRef = useRef(null);
+  const threadRef = useRef(null);
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    // Scroll the thread itself, never the page (scrollIntoView would also
+    // scroll the window, dragging the sticky header and context bar away).
+    // On phones the quick-reply pills under Ginni's latest message can be
+    // taller than the screen, so park her latest bubble at the top so the
+    // reply and its options read together; otherwise go to the end.
+    const thread = threadRef.current;
+    if (!thread) return;
+    const mobile = typeof window !== "undefined" && window.matchMedia("(max-width: 820px)").matches;
+    const anchor = lastGinniRef.current;
+    if (mobile && anchor && messages[messages.length - 1]?.role === "ginni") {
+      const top = anchor.getBoundingClientRect().top - thread.getBoundingClientRect().top + thread.scrollTop - 10;
+      thread.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    } else {
+      thread.scrollTo({ top: thread.scrollHeight, behavior: "smooth" });
+    }
   }, [messages]);
+
 
   function handleSend(rawText) {
     const text = (rawText || "").trim();
@@ -359,6 +382,11 @@ export default function ChatPanel({
   }
 
   const composerDisabled = busy || !!activeDraw || historyLoading;
+  // Pills show whenever it's the person's turn: Ginni spoke last and nothing
+  // is in flight. They vanish the moment a question is sent (a user bubble
+  // becomes last) and reappear under the reading that follows.
+  const lastMsg = messages[messages.length - 1];
+  const showQuickReplies = !!onPickTopic && !composerDisabled && !!lastMsg && lastMsg.role === "ginni";
   const freeLeft = access?.freeLeft ?? 0;
 
   // Direct pay from the banner above the composer — one tap opens Razorpay,
@@ -395,23 +423,39 @@ export default function ChatPanel({
 
   return (
     <div className="chat-shell">
-      <div className="chat-thread">
+      <div className="chat-thread" ref={threadRef}>
         {historyLoading ? (
           <div className="chat-row ginni">
             <div className="chat-bubble ginni">Aapki purani baatein la rahi hoon…</div>
           </div>
         ) : (
-          messages.map((msg) => (
-            <ChatBubble
-              onOpenQuestions={onOpenQuestions}
+          messages.map((msg, i) => (
+            <div
               key={msg.id}
-              msg={msg}
-              lang={lang}
-              onRevealResolved={handleRevealResolved}
-              onFollowup={handleFollowup}
-              usedFollowups={usedFollowups}
-            />
+              ref={i === messages.length - 1 && msg.role === "ginni" ? lastGinniRef : undefined}
+              className="chat-msg-anchor"
+            >
+              <ChatBubble
+                msg={msg}
+                lang={lang}
+                onRevealResolved={handleRevealResolved}
+                onFollowup={handleFollowup}
+                usedFollowups={usedFollowups}
+              />
+            </div>
           ))
+        )}
+        {showQuickReplies && (
+          <div className="quick-replies mobile-only">
+            <div className="quick-replies-label">{QUICK_LABEL[lang] || QUICK_LABEL.hinglish}</div>
+            <div className="quick-replies-pills">
+              {TOPICS.map((t) => (
+                <button key={t.id} type="button" className="quick-pill" onClick={() => onPickTopic?.(t)}>
+                  {t.title}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
         <div ref={endRef} />
       </div>
@@ -450,20 +494,6 @@ export default function ChatPanel({
             handleSend(input);
           }}
         >
-          {onOpenQuestions && (
-            <button
-              type="button"
-              className="chat-questions-btn mobile-only"
-              onClick={onOpenQuestions}
-              disabled={composerDisabled}
-              aria-label={QUESTIONS_LABEL[lang] || QUESTIONS_LABEL.hinglish}
-            >
-              <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
-                <path d="M3 5h14M3 10h14M3 15h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
-              </svg>
-              <span>{QUESTIONS_LABEL[lang] || QUESTIONS_LABEL.hinglish}</span>
-            </button>
-          )}
           <input
             className="chat-input"
             value={input}
@@ -514,7 +544,7 @@ const FOLLOWUP_LABELS = {
   hindi: { universe: "🌙 और समझाइए", spiritual: "✨ गहरा अर्थ" },
 };
 
-function ChatBubble({ msg, lang, onRevealResolved, onFollowup, usedFollowups, onOpenQuestions }) {
+function ChatBubble({ msg, lang, onRevealResolved, onFollowup, usedFollowups }) {
   if (msg.role === "user") {
     return (
       <div className="chat-row user">
@@ -554,11 +584,6 @@ function ChatBubble({ msg, lang, onRevealResolved, onFollowup, usedFollowups, on
               );
             })}
             {msg.resolvedText && <ShareButton card={msg.card} text={msg.resolvedText} />}
-            {onOpenQuestions && (
-              <button type="button" className="reveal-followup-btn mobile-only" onClick={onOpenQuestions}>
-                {NEW_QUESTION_LABEL[lang] || NEW_QUESTION_LABEL.hinglish}
-              </button>
-            )}
           </div>
         </div>
       </div>

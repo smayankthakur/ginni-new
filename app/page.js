@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import AuthGate from "@/components/AuthGate";
 import Onboarding from "@/components/Onboarding";
 import Sidebar from "@/components/Sidebar";
-import QuestionSheet from "@/components/QuestionSheet";
 import ChatPanel from "@/components/ChatPanel";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
@@ -14,9 +13,7 @@ export default function Home() {
   const [me, setMe] = useState(null); // null while loading; {loggedIn, ...access} once known
   const [session, setSession] = useState(null); // {name, lang} — onboarding personalization, separate from auth
   const [activeTopic, setActiveTopic] = useState(null); // highlight only — the chat below is the source of truth
-  const [pendingAsk, setPendingAsk] = useState(null);
-  // Mobile question picker (components/QuestionSheet.jsx); desktop uses the sidebar.
-  const [questionsOpen, setQuestionsOpen] = useState(false); // {text, nonce} — a sidebar click waiting to be sent
+  const [pendingAsk, setPendingAsk] = useState(null); // {text, nonce} — a sidebar click waiting to be sent
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -79,20 +76,10 @@ export default function Home() {
                 pendingAsk={pendingAsk}
                 onConsumedAsk={() => setPendingAsk(null)}
                 onTopicResolved={(topicId) => setActiveTopic(TOPICS.find((t) => t.id === topicId) || null)}
-                onOpenQuestions={() => setQuestionsOpen(true)}
+                onPickTopic={handleSelectTopic}
               />
             </div>
           </main>
-          <QuestionSheet
-            open={questionsOpen}
-            lang={session.lang}
-            activeTopicId={activeTopic?.id}
-            onSelect={(topic) => {
-              setQuestionsOpen(false);
-              handleSelectTopic(topic);
-            }}
-            onClose={() => setQuestionsOpen(false)}
-          />
         </div>
       )}
 
