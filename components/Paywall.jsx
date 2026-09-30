@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
-const MONTHLY_PRICE_INR = 199;
+import { MONTHLY_PRICE_INR, startSubscriptionCheckout } from "@/lib/razorpayCheckout";
 
 export default function Paywall({ name, onUnlocked }) {
   const [loading, setLoading] = useState(false);
@@ -12,54 +11,18 @@ export default function Paywall({ name, onUnlocked }) {
     setError(null);
     setLoading(true);
     try {
-      const orderRes = await fetch("/api/create-order", { method: "POST" });
-      const order = await orderRes.json();
-      if (!orderRes.ok) throw new Error(order.error || "Could not start payment.");
-
-      if (typeof window.Razorpay === "undefined") {
-        throw new Error("Payment isn't ready yet — please try again in a moment.");
-      }
-
-      const rzp = new window.Razorpay({
-        key: order.keyId,
-        amount: order.amount,
-        currency: order.currency,
-        order_id: order.orderId,
-        name: "The Divine Tarot",
-        description: "Ginni Ki Baatein — 30 day full access",
-        theme: { color: "#6d28d9" },
-        prefill: name ? { name } : undefined,
-        handler: async function (response) {
-          try {
-            const verifyRes = await fetch("/api/verify-payment", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(response),
-            });
-            const verifyData = await verifyRes.json();
-            if (!verifyRes.ok || !verifyData.verified) {
-              throw new Error(verifyData.error || "Payment could not be verified.");
-            }
-            onUnlocked?.(verifyData.access);
-          } catch (e) {
-            setError(e.message || "Payment succeeded but verification failed. Contact support.");
-          } finally {
-            setLoading(false);
-          }
+      await startSubscriptionCheckout({
+        name,
+        onUnlocked: (access) => {
+          setLoading(false);
+          onUnlocked?.(access);
         },
-        modal: {
-          ondismiss: function () {
-            setLoading(false);
-          },
+        onError: (message) => {
+          setError(message);
+          setLoading(false);
         },
+        onDismiss: () => setLoading(false),
       });
-
-      rzp.on("payment.failed", function () {
-        setError("Payment failed — please try again.");
-        setLoading(false);
-      });
-
-      rzp.open();
     } catch (e) {
       setError(e.message || "Something went wrong.");
       setLoading(false);

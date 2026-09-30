@@ -9,6 +9,7 @@ import { buildShareImage, shareOrDownloadImage } from "@/lib/shareImage";
 import DrawOverlay from "./DrawOverlay";
 import RevealCard from "./RevealCard";
 import Paywall from "./Paywall";
+import { MONTHLY_PRICE_INR, startSubscriptionCheckout } from "@/lib/razorpayCheckout";
 
 const INTRO = {
   hinglish: (name) =>
@@ -42,6 +43,39 @@ const LIMIT_MESSAGE = {
   hinglish: (name) => `${name}, aapki 3 free readings poori ho gayi hain. Neeche se 30 din ka full access unlock kijiye. 🌙`,
   english: (name) => `${name}, your 3 free readings are used up. Unlock 30 days of full access below. 🌙`,
   hindi: (name) => `${name}, आपकी 3 फ़्री रीडिंग्स पूरी हो गई हैं। नीचे से 30 दिन का फुल एक्सेस अनलॉक कीजिए। 🌙`,
+};
+
+// Shown as Ginni's reply the moment /api/verify-payment confirms a payment
+// made from the "Subscribe now" button below the composer — so the person
+// sees their access open right there in the conversation, no reload.
+const UNLOCKED_MESSAGE = {
+  hinglish: (name) => `${name}, aapka 30 din ka full access khul gaya hai! 🌟 Ab jitne chahein utne sawaal poochhiye — main yahin hoon.`,
+  english: (name) => `${name}, your 30-day full access is now open! 🌟 Ask as many questions as you like — I'm right here.`,
+  hindi: (name) => `${name}, आपका 30 दिन का फुल एक्सेस खुल गया है! 🌟 अब जितने चाहें उतने सवाल पूछिए — मैं यहीं हूँ।`,
+};
+
+// The always-visible pay control above the composer (client's ask: the
+// "subscribe for unlimited access" line must itself be the way to pay,
+// right on the screen, not just a note).
+const SUBSCRIBE_LABELS = {
+  hinglish: {
+    remaining: (n) => `${n} free reading${n === 1 ? "" : "s"} baaki`,
+    upsell: `Unlimited access — ₹${MONTHLY_PRICE_INR}/month`,
+    payNow: `Free readings khatam — Subscribe karein ₹${MONTHLY_PRICE_INR}/month · Pay & turant unlock`,
+    opening: "Payment khul raha hai…",
+  },
+  english: {
+    remaining: (n) => `${n} free reading${n === 1 ? "" : "s"} remaining`,
+    upsell: `Unlimited access — ₹${MONTHLY_PRICE_INR}/month`,
+    payNow: `Free readings used — Subscribe ₹${MONTHLY_PRICE_INR}/month · Pay & unlock instantly`,
+    opening: "Opening payment…",
+  },
+  hindi: {
+    remaining: (n) => `${n} फ़्री रीडिंग बाकी`,
+    upsell: `अनलिमिटेड एक्सेस — ₹${MONTHLY_PRICE_INR}/माह`,
+    payNow: `फ़्री रीडिंग्स ख़त्म — सब्सक्राइब करें ₹${MONTHLY_PRICE_INR}/माह · पे करें और तुरंत अनलॉक`,
+    opening: "पेमेंट खुल रहा है…",
+  },
 };
 
 const GENERIC_ERROR = {
@@ -98,6 +132,11 @@ export default function ChatPanel({
   const [activeDraw, setActiveDraw] = useState(null); // {id, topicId, spread, flippingCard}
   const [busy, setBusy] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  // Loading/error state for the pay button above the composer. Kept
+  // separate from `busy` (which gates sending questions) so an open
+  // Razorpay window never blocks, and is never blocked by, the chat itself.
+  const [payBusy, setPayBusy] = useState(false);
+  const [payError, setPayError] = useState(null);
   const endRef = useRef(null);
 
   const busyRef = useRef(false);
@@ -312,6 +351,38 @@ export default function ChatPanel({
   const composerDisabled = busy || !!activeDraw || historyLoading;
   const freeLeft = access?.freeLeft ?? 0;
 
+  // Direct pay from the banner above the composer — one tap opens Razorpay,
+  // and as soon as the server verifies the payment the new `access` is
+  // applied (which hides the banner and lifts the limit) and Ginni
+  // confirms it in the thread. Same server-side verification as the
+  // Paywall modal; this just removes the extra step of finding the modal.
+  async function handlePayNow() {
+    if (payBusy) return;
+    setPayError(null);
+    setPayBusy(true);
+    try {
+      await startSubscriptionCheckout({
+        name,
+        onUnlocked: (newAccess) => {
+          setPayBusy(false);
+          setShowPaywall(false);
+          onAccessChange?.(newAccess);
+          const text = UNLOCKED_MESSAGE[lang]?.(name) || UNLOCKED_MESSAGE.hinglish(name);
+          setMessages((m) => [...m, { id: nextId(), role: "ginni", kind: "text", text }]);
+          persistMessage({ role: "ginni", kind: "text", text });
+        },
+        onError: (message) => {
+          setPayError(message);
+          setPayBusy(false);
+        },
+        onDismiss: () => setPayBusy(false),
+      });
+    } catch (e) {
+      setPayError(e.message || "Something went wrong.");
+      setPayBusy(false);
+    }
+  }
+
   return (
     <div className="chat-shell">
       <div className="chat-thread">
@@ -335,13 +406,27 @@ export default function ChatPanel({
       </div>
 
       <div className="chat-composer-wrap">
-        {!access?.subscribed && (
-          <p className="chat-free-note">
-            {freeLeft > 0
-              ? `${freeLeft} free reading${freeLeft === 1 ? "" : "s"} remaining`
-              : "Free readings used — subscribe for unlimited access"}
-          </p>
-        )}
+        {!access?.subscribed && (() => {
+          const L = SUBSCRIBE_LABELS[lang] || SUBSCRIBE_LABELS.hinglish;
+          return (
+            <div className="chat-free-note">
+              {freeLeft > 0 ? (
+                <>
+                  <span>{L.remaining(freeLeft)}</span>
+                  <span className="chat-free-note-sep" aria-hidden="true">·</span>
+                  <button type="button" className="chat-subscribe-link" onClick={handlePayNow} disabled={payBusy}>
+                    {payBusy ? L.opening : L.upsell}
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="chat-subscribe-btn" onClick={handlePayNow} disabled={payBusy}>
+                  {payBusy ? L.opening : L.payNow}
+                </button>
+              )}
+              {payError && <span className="chat-pay-error">{payError}</span>}
+            </div>
+          );
+        })()}
         <form
           className="chat-composer"
           onSubmit={(e) => {
