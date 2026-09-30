@@ -62,7 +62,10 @@ export default function SiteHeader() {
   useEffect(() => {
     const root = document.documentElement;
     const setCompact = (compact) => {
-      root.style.setProperty("--site-header-h", compact ? "48px" : "80px");
+      // Full height is 64px on phones (≤820px, matching the mobile default in
+      // globals.css) and 80px on desktop; compact is 48px.
+      const full = window.innerWidth <= 820 ? "64px" : "80px";
+      root.style.setProperty("--site-header-h", compact ? "48px" : full);
     };
     const onScroll = () => {
       if (window.innerWidth > 820 || open) {

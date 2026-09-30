@@ -82,7 +82,7 @@ export default function DrawOverlay({ open, lang, spread, flippingCard, onPick, 
                   disabledOther={!!flippingCard && c !== flippingCard}
                   onPick={onPick}
                   style={{
-                    marginLeft: i === 0 ? 0 : "-30px",
+                    marginLeft: i === 0 ? 0 : "var(--card-overlap, -30px)", // ≤520px widens this in globals.css
                     zIndex: c === flippingCard ? 200 : i,
                     animationDelay: `${Math.min(i * 10, 700)}ms`,
                   }}

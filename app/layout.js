@@ -1,6 +1,15 @@
 import "./globals.css";
 import Script from "next/script";
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  // Chrome Android: shrink the layout viewport when the keyboard opens so
+  // the chat composer stays visible above it instead of being covered.
+  interactiveWidget: "resizes-content",
+};
+
 export const metadata = {
   title: "Ginni Ki Baatein | The Divine Tarot",
   description: "A private tarot counsel from The Divine Tarot — refined Hinglish readings for clarity and strategic foresight.",

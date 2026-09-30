@@ -13,112 +13,36 @@ const LANGS = [
 export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onChangeLang, onRestart, onLogout, referralCode }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const activeTopic = TOPICS.find((t) => t.id === activeTopicId) || null;
-
-  // aria-hidden gets applied to .topic-drawer the instant drawerOpen flips
-  // false. If the close button (or anything else inside the drawer) still
-  // holds focus at that moment, the browser logs an aria-hidden/focus
-  // conflict and screen-reader users are left with focus stuck inside a
-  // now-hidden region. Blur whatever's focused inside the drawer first, so
-  // it's never aria-hidden while focused.
-  function closeDrawer() {
-    if (
-      document.activeElement &&
-      document.activeElement.closest?.(".topic-drawer")
-    ) {
-      document.activeElement.blur();
-    }
-    setDrawerOpen(false);
-  }
-
-  function pickFromDrawer(t) {
-    onSelectTopic(t);
-    closeDrawer();
-  }
 
   return (
     <>
-      {/* Mobile top bar — only visible under 820px */}
+      {/* Mobile context bar — only visible under 820px (desktop hides it).
+          One slim row: who the reading is for, plus a settings pill that
+          opens the sheet below (language / invite / start over / log out). */}
       <div className="mobile-topbar">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="The Divine Tarot" className="mobile-topbar-glyph" />
-        <span className="brand">Ginni Ki Baatein</span>
+        <span className="mobile-topbar-user">
+          Reading for <b>{name}</b>
+        </span>
         <button
-          className="avatar-btn"
+          type="button"
+          className="mobile-settings-btn"
           aria-label={panelOpen ? "Close settings" : "Open settings"}
           aria-expanded={panelOpen}
           onClick={() => setPanelOpen((o) => !o)}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="" />
+          {LANG_LABEL[lang]} <span aria-hidden="true">▾</span>
         </button>
-      </div>
-
-      {/* Mobile question trigger — replaces the old always-visible chip strip.
-          Opens the same numbered topic-list markup the desktop sidebar uses
-          (topic-num / topic-title / topic-meta) in a full-screen drawer, so
-          nothing is truncated or hidden behind horizontal scroll anymore,
-          and it collapses back to one slim row instead of permanently
-          occupying its own sticky strip. */}
-      <button
-        type="button"
-        className="question-trigger"
-        aria-haspopup="dialog"
-        aria-expanded={drawerOpen}
-        onClick={() => setDrawerOpen(true)}
-      >
-        <span className="question-trigger-label">
-          {activeTopic ? activeTopic.title : "Choose a question"}
-        </span>
-        <span className="question-trigger-chevron" aria-hidden="true">▾</span>
-      </button>
-
-      {drawerOpen && (
-        <div className="topic-drawer-backdrop mobile-only" onClick={closeDrawer} />
-      )}
-      <div
-        className={"topic-drawer mobile-only" + (drawerOpen ? " open" : "")}
-        role="dialog"
-        aria-label="Choose a question"
-        aria-hidden={!drawerOpen}
-      >
-        <div className="topic-drawer-header">
-          <span>Choose a question</span>
-          <button
-            type="button"
-            className="topic-drawer-close"
-            aria-label="Close"
-            onClick={closeDrawer}
-          >
-            ×
-          </button>
-        </div>
-        <ul className="topic-list topic-list--drawer">
-          {TOPICS.map((t) => (
-            <li
-              key={t.id}
-              className={"topic-item" + (activeTopicId === t.id ? " selected" : "")}
-              onClick={() => pickFromDrawer(t)}
-            >
-              <span className="topic-num">{String(t.id).padStart(2, "0")}</span>
-              <span className="topic-text">
-                <span className="topic-title">{t.title}</span>
-                <span className="topic-meta">
-                  {t.cards} card{t.cards > 1 ? "s" : ""}
-                </span>
-              </span>
-            </li>
-          ))}
-        </ul>
       </div>
 
       {panelOpen && <div className="sidebar-backdrop mobile-only" onClick={() => setPanelOpen(false)} />}
 
       {/* Compact mobile settings panel — language + restart only; topics are never hidden here */}
-      <div className={"mobile-settings-panel" + (panelOpen ? " open" : "")}>
-        <div className="sidebar-user">
-          Reading for <b>{name}</b> · {LANG_LABEL[lang]}
+      <div className={"mobile-settings-panel" + (panelOpen ? " open" : "")} role="dialog" aria-label="Settings" aria-hidden={!panelOpen}>
+        <div className="qsheet-handle" aria-hidden="true" />
+        <div className="mobile-settings-head">
+          <span>Reading for <b>{name}</b></span>
+          <button type="button" className="qsheet-close" aria-label="Close" onClick={() => setPanelOpen(false)}>✕</button>
         </div>
         {onChangeLang && (
           <div className="lang-switch">
@@ -128,7 +52,7 @@ export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onCh
                 <button
                   key={l.key}
                   className={"lang-chip" + (lang === l.key ? " active" : "")}
-                  onClick={() => onChangeLang(l.key)}
+                  onClick={() => { onChangeLang(l.key); setPanelOpen(false); }}
                 >
                   {l.label}
                 </button>
@@ -136,7 +60,7 @@ export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onCh
             </div>
           </div>
         )}
-        <button className="restart-link" onClick={() => setInviteOpen(true)}>
+        <button className="restart-link" onClick={() => { setPanelOpen(false); setInviteOpen(true); }}>
           Invite a friend
         </button>
         <button className="restart-link" onClick={onRestart}>

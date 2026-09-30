@@ -63,21 +63,29 @@ const SUBSCRIBE_LABELS = {
     remaining: (n) => `${n} free reading${n === 1 ? "" : "s"} baaki`,
     upsell: `Unlimited access — ₹${MONTHLY_PRICE_INR}/month`,
     payNow: `Free readings khatam — Subscribe karein ₹${MONTHLY_PRICE_INR}/month · Pay & turant unlock`,
+    payNowShort: `Free readings khatam · Subscribe ₹${MONTHLY_PRICE_INR}/month →`,
     opening: "Payment khul raha hai…",
   },
   english: {
     remaining: (n) => `${n} free reading${n === 1 ? "" : "s"} remaining`,
     upsell: `Unlimited access — ₹${MONTHLY_PRICE_INR}/month`,
     payNow: `Free readings used — Subscribe ₹${MONTHLY_PRICE_INR}/month · Pay & unlock instantly`,
+    payNowShort: `Free readings used · Subscribe ₹${MONTHLY_PRICE_INR}/month →`,
     opening: "Opening payment…",
   },
   hindi: {
     remaining: (n) => `${n} फ़्री रीडिंग बाकी`,
     upsell: `अनलिमिटेड एक्सेस — ₹${MONTHLY_PRICE_INR}/माह`,
     payNow: `फ़्री रीडिंग्स ख़त्म — सब्सक्राइब करें ₹${MONTHLY_PRICE_INR}/माह · पे करें और तुरंत अनलॉक`,
+    payNowShort: `फ़्री रीडिंग्स ख़त्म · सब्सक्राइब ₹${MONTHLY_PRICE_INR}/माह →`,
     opening: "पेमेंट खुल रहा है…",
   },
 };
+
+// Composer button that opens the mobile question sheet, and the "ask
+// another question" follow-up under every reading (both mobile-only).
+const QUESTIONS_LABEL = { hinglish: "Sawaal", english: "Questions", hindi: "सवाल" };
+const NEW_QUESTION_LABEL = { hinglish: "🔮 Naya sawaal", english: "🔮 New question", hindi: "🔮 नया सवाल" };
 
 const GENERIC_ERROR = {
   hinglish: "Kshama kijiye, kuch gadbad ho gayi — thodi der baad phir koshish kijiye.",
@@ -123,6 +131,7 @@ export default function ChatPanel({
   pendingAsk,
   onConsumedAsk,
   onTopicResolved,
+  onOpenQuestions,
 }) {
   const [messages, setMessages] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -394,6 +403,7 @@ export default function ChatPanel({
         ) : (
           messages.map((msg) => (
             <ChatBubble
+              onOpenQuestions={onOpenQuestions}
               key={msg.id}
               msg={msg}
               lang={lang}
@@ -421,7 +431,12 @@ export default function ChatPanel({
                 </>
               ) : (
                 <button type="button" className="chat-subscribe-btn" onClick={handlePayNow} disabled={payBusy}>
-                  {payBusy ? L.opening : L.payNow}
+                  {payBusy ? L.opening : (
+                    <>
+                      <span className="label-long">{L.payNow}</span>
+                      <span className="label-short">{L.payNowShort}</span>
+                    </>
+                  )}
                 </button>
               )}
               {payError && <span className="chat-pay-error">{payError}</span>}
@@ -435,6 +450,20 @@ export default function ChatPanel({
             handleSend(input);
           }}
         >
+          {onOpenQuestions && (
+            <button
+              type="button"
+              className="chat-questions-btn mobile-only"
+              onClick={onOpenQuestions}
+              disabled={composerDisabled}
+              aria-label={QUESTIONS_LABEL[lang] || QUESTIONS_LABEL.hinglish}
+            >
+              <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+                <path d="M3 5h14M3 10h14M3 15h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
+              </svg>
+              <span>{QUESTIONS_LABEL[lang] || QUESTIONS_LABEL.hinglish}</span>
+            </button>
+          )}
           <input
             className="chat-input"
             value={input}
@@ -485,7 +514,7 @@ const FOLLOWUP_LABELS = {
   hindi: { universe: "🌙 और समझाइए", spiritual: "✨ गहरा अर्थ" },
 };
 
-function ChatBubble({ msg, lang, onRevealResolved, onFollowup, usedFollowups }) {
+function ChatBubble({ msg, lang, onRevealResolved, onFollowup, usedFollowups, onOpenQuestions }) {
   if (msg.role === "user") {
     return (
       <div className="chat-row user">
@@ -525,6 +554,11 @@ function ChatBubble({ msg, lang, onRevealResolved, onFollowup, usedFollowups }) 
               );
             })}
             {msg.resolvedText && <ShareButton card={msg.card} text={msg.resolvedText} />}
+            {onOpenQuestions && (
+              <button type="button" className="reveal-followup-btn mobile-only" onClick={onOpenQuestions}>
+                {NEW_QUESTION_LABEL[lang] || NEW_QUESTION_LABEL.hinglish}
+              </button>
+            )}
           </div>
         </div>
       </div>
