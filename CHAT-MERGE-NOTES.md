@@ -346,6 +346,8 @@ re-edit `DATABASE_URL` directly in Vercel and confirm via
 `/api/debug/db-config` that `hasPgbouncerParam` shows `"true"` before
 testing login again. Nothing in this round touches that.
 
+*(Update: `/api/debug/db-config` has since been deleted before going live — it was always meant to be temporary. `DATABASE_URL` must include `?pgbouncer=true` on the transaction-pooler URL; there is no longer an endpoint to inspect it, check the value in Vercel → Settings → Environment Variables instead.)*
+
 Re-verified: `eslint` clean across every changed file (zero errors,
 one pre-existing unrelated warning in `app/layout.js` about font loading).
 `next build` compiles (same pre-existing, unrelated Prisma sandbox limit
