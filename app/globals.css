@@ -1,28 +1,36 @@
 
 :root{
-  --bg-deep:#0a0815;
-  --bg-panel:#141126;
-  --bg-panel-raised:#1c1836;
-  --bg-card-back:#181430;
-  --gold:#c9a24d;
-  --gold-soft:#e3c98a;
-  --rose:#c97b84;
-  /* brand violet, matched to thedivinetarotonline.com's theme color (#6d28d9), deepened for a witchier feel */
-  --violet:#6d28d9;
-  --violet-soft:#a78bfa;
-  --violet-deep:#3b1470;
-  --violet-glow:rgba(167,139,250,0.32);
-  --moonlight:#b9c4e8;
-  --moonlight-soft:rgba(185,196,232,0.55);
-  --text-primary:#eee9fb;
-  --text-muted:#948dbd;
-  --text-faint:#615a85;
-  --hairline:rgba(201,162,77,0.14);
-  --hairline-strong:rgba(201,162,77,0.30);
-  --radius:14px;
-  --serif: 'Cormorant Garamond', serif;
+  /* Palette = thedivinetarotonline.com's own design tokens (its :root
+     --bg-primary / --surface / --gold / --gold-light / --accent-start /
+     --accent-end / --text-primary / --text-secondary / --border), so this
+     app reads as the same brand as the main site, not a violet cousin. */
+  --bg-deep:#0b0b0f;
+  --bg-panel:#1a1a1a;
+  --bg-panel-raised:#202020;
+  --bg-card-back:#171412;
+  --gold:#f4c542;
+  --gold-soft:#ffe4a8;
+  --gold-deep:#b8863a;
+  --rose:#ff6b6b;
+  /* CTA gradient exactly as on the main site ("Ask your question here",
+     "Unlock My Full Reading"): red -> gold, black text, pill. */
+  --accent-start:#ff4d4d;
+  --accent-end:#ffd700;
+  --accent-gradient:linear-gradient(to right, var(--accent-start), var(--accent-end));
+  --accent-glow:rgba(244,197,66,0.30);
+  --maroon:#2a0d0d;
+  --brown:#3c281e;
+  --moonlight:#a1a1aa;
+  --moonlight-soft:rgba(161,161,170,0.55);
+  --text-primary:#eaeaf0;
+  --text-muted:#a1a1aa;
+  --text-faint:#7a7a7a;
+  --hairline:rgba(255,255,255,0.10);
+  --hairline-strong:rgba(244,197,66,0.35);
+  --radius:16px;
+  --serif: 'Playfair Display', serif;
   --display: 'Cinzel', serif;
-  --sans: 'Work Sans', sans-serif;
+  --sans: 'Inter', sans-serif;
 }
 
 *{box-sizing:border-box;}
@@ -30,10 +38,9 @@ html,body{height:100%;}
 body{
   margin:0;
   background:
-    radial-gradient(1200px 700px at 15% -10%, rgba(109,40,217,0.18), transparent 60%),
-    radial-gradient(1000px 800px at 100% 5%, rgba(201,162,77,0.06), transparent 55%),
-    radial-gradient(900px 900px at 50% 115%, rgba(59,20,112,0.45), transparent 60%),
-    radial-gradient(700px 500px at 90% 90%, rgba(185,196,232,0.05), transparent 60%),
+    radial-gradient(1200px 700px at 15% -10%, rgba(244,197,66,0.07), transparent 60%),
+    radial-gradient(1000px 800px at 100% 5%, rgba(255,77,77,0.05), transparent 55%),
+    radial-gradient(900px 900px at 50% 115%, rgba(42,13,13,0.55), transparent 60%),
     var(--bg-deep);
   color:var(--text-primary);
   font-family:var(--sans);
@@ -45,16 +52,16 @@ body{
 .stars{
   position:fixed; inset:0; pointer-events:none; z-index:0;
   background-image:
-    radial-gradient(1.5px 1.5px at 20% 30%, rgba(241,238,251,0.5), transparent 60%),
-    radial-gradient(1px 1px at 70% 20%, rgba(241,238,251,0.35), transparent 60%),
-    radial-gradient(1.5px 1.5px at 85% 65%, rgba(241,238,251,0.4), transparent 60%),
-    radial-gradient(1px 1px at 40% 80%, rgba(241,238,251,0.3), transparent 60%),
-    radial-gradient(1px 1px at 55% 45%, rgba(241,238,251,0.25), transparent 60%),
-    radial-gradient(1.5px 1.5px at 10% 65%, rgba(241,238,251,0.3), transparent 60%),
-    radial-gradient(1px 1px at 92% 35%, rgba(241,238,251,0.3), transparent 60%),
-    radial-gradient(1px 1px at 30% 12%, rgba(241,238,251,0.3), transparent 60%),
-    radial-gradient(1.5px 1.5px at 63% 78%, rgba(241,238,251,0.35), transparent 60%),
-    radial-gradient(1px 1px at 78% 8%, rgba(241,238,251,0.25), transparent 60%);
+    radial-gradient(1.5px 1.5px at 20% 30%, rgba(255,255,255,0.5), transparent 60%),
+    radial-gradient(1px 1px at 70% 20%, rgba(255,255,255,0.35), transparent 60%),
+    radial-gradient(1.5px 1.5px at 85% 65%, rgba(255,255,255,0.4), transparent 60%),
+    radial-gradient(1px 1px at 40% 80%, rgba(255,255,255,0.3), transparent 60%),
+    radial-gradient(1px 1px at 55% 45%, rgba(255,255,255,0.25), transparent 60%),
+    radial-gradient(1.5px 1.5px at 10% 65%, rgba(255,255,255,0.3), transparent 60%),
+    radial-gradient(1px 1px at 92% 35%, rgba(255,255,255,0.3), transparent 60%),
+    radial-gradient(1px 1px at 30% 12%, rgba(255,255,255,0.3), transparent 60%),
+    radial-gradient(1.5px 1.5px at 63% 78%, rgba(255,255,255,0.35), transparent 60%),
+    radial-gradient(1px 1px at 78% 8%, rgba(255,255,255,0.25), transparent 60%);
   opacity:0.6;
   animation:twinkle 7s ease-in-out infinite;
 }
@@ -65,8 +72,8 @@ body{
 .aurora{
   position:fixed; inset:0; pointer-events:none; z-index:0;
   background:
-    radial-gradient(650px 450px at var(--aurora-x,20%) var(--aurora-y,20%), rgba(109,40,217,0.16), transparent 65%),
-    radial-gradient(500px 350px at var(--aurora2-x,75%) var(--aurora2-y,70%), rgba(212,175,106,0.08), transparent 65%);
+    radial-gradient(650px 450px at var(--aurora-x,20%) var(--aurora-y,20%), rgba(244,197,66,0.12), transparent 65%),
+    radial-gradient(500px 350px at var(--aurora2-x,75%) var(--aurora2-y,70%), rgba(244,197,66,0.08), transparent 65%);
   animation:driftAurora 22s ease-in-out infinite;
   filter:blur(2px);
 }
@@ -85,8 +92,8 @@ body{
   to{opacity:1;}
 }
 @keyframes gentlePulse{
-  0%,100%{transform:scale(1); filter:drop-shadow(0 0 0 rgba(212,175,106,0)) drop-shadow(0 0 0 rgba(109,40,217,0));}
-  50%{transform:scale(1.06); filter:drop-shadow(0 0 8px rgba(212,175,106,0.4)) drop-shadow(0 0 10px rgba(109,40,217,0.35));}
+  0%,100%{transform:scale(1); filter:drop-shadow(0 0 0 rgba(244,197,66,0)) drop-shadow(0 0 0 rgba(244,197,66,0));}
+  50%{transform:scale(1.06); filter:drop-shadow(0 0 8px rgba(244,197,66,0.4)) drop-shadow(0 0 10px rgba(244,197,66,0.26));}
 }
 
 a{color:inherit;}
@@ -121,7 +128,7 @@ button{font-family:inherit;}
   width:56px;height:66px;margin:0 auto 18px;
   display:block;
   object-fit:contain;
-  filter:drop-shadow(0 4px 14px rgba(109,40,217,0.45));
+  filter:drop-shadow(0 4px 14px rgba(244,197,66,0.34));
   animation:gentlePulse 3.2s ease-in-out infinite;
 }
 .onboard-card h1{
@@ -194,34 +201,34 @@ button{font-family:inherit;}
 .lang-opt:active{transform:translateY(0) scale(0.97);}
 .lang-opt.active{
   border-color:var(--gold);
-  background:linear-gradient(135deg, rgba(109,40,217,0.16), rgba(212,175,106,0.10));
+  background:linear-gradient(135deg, rgba(244,197,66,0.12), rgba(244,197,66,0.1));
   color:var(--gold-soft);
   animation:langPulse .4s ease;
 }
 .lang-opt.active .lang-native{color:var(--gold-soft);}
 @keyframes langPulse{
-  0%{box-shadow:0 0 0 0 rgba(167,139,250,0.4);}
-  100%{box-shadow:0 0 0 8px rgba(167,139,250,0);}
+  0%{box-shadow:0 0 0 0 rgba(255,215,0,0.34);}
+  100%{box-shadow:0 0 0 8px rgba(255,215,0,0);}
 }
 
 .btn-primary{
   width:100%;
   margin-top:8px;
-  background:linear-gradient(135deg, var(--violet-soft), var(--violet) 70%);
-  color:#fff;
+  background:var(--accent-gradient);
+  color:#000;
   border:none;
-  border-radius:10px;
+  border-radius:999px;
   padding:15px;
   font-size:15px;
   font-weight:600;
   letter-spacing:0.02em;
   cursor:pointer;
   transition:transform .15s ease, box-shadow .15s ease;
-  box-shadow:0 10px 26px rgba(109,40,217,0.32), inset 0 0 0 1px rgba(212,175,106,0.25);
+  box-shadow:0 10px 26px rgba(244,197,66,0.24), inset 0 0 0 1px rgba(244,197,66,0.25);
   opacity:0;
   animation:fadeInUp .5s ease .35s both;
 }
-.btn-primary:hover{transform:translateY(-1px); box-shadow:0 14px 34px rgba(109,40,217,0.4), inset 0 0 0 1px rgba(212,175,106,0.35);}
+.btn-primary:hover{transform:translateY(-1px); box-shadow:0 14px 34px rgba(244,197,66,0.3), inset 0 0 0 1px rgba(244,197,66,0.35);}
 .btn-primary:disabled{opacity:0.4; cursor:not-allowed; transform:none; box-shadow:none;}
 
 .auth-switch{
@@ -258,7 +265,7 @@ button{font-family:inherit;}
   padding:14px 16px;
   padding-top:calc(14px + env(safe-area-inset-top, 0px));
   border-bottom:1px solid var(--hairline);
-  background:rgba(18,16,42,0.92);
+  background:rgba(26,26,26,0.92);
   backdrop-filter:blur(10px);
   position:sticky; top:0; z-index:20;
 }
@@ -337,14 +344,14 @@ button{font-family:inherit;}
 .topic-item:hover{background:rgba(255,255,255,0.03);}
 .topic-item:active{transform:scale(0.98);}
 .topic-item.selected{
-  background:linear-gradient(135deg, rgba(109,40,217,0.14), rgba(212,175,106,0.08));
+  background:linear-gradient(135deg, rgba(244,197,66,0.11), rgba(244,197,66,0.08));
   border-color:var(--hairline);
-  box-shadow:inset 2px 0 0 var(--violet-soft);
+  box-shadow:inset 2px 0 0 var(--gold);
   animation:fadeInUp .45s ease forwards, selectPulse .4s ease;
 }
 @keyframes selectPulse{
-  0%{box-shadow:inset 2px 0 0 var(--violet-soft), 0 0 0 0 rgba(167,139,250,0.35);}
-  100%{box-shadow:inset 2px 0 0 var(--violet-soft), 0 0 0 8px rgba(167,139,250,0);}
+  0%{box-shadow:inset 2px 0 0 var(--gold), 0 0 0 0 rgba(255,215,0,0.3);}
+  100%{box-shadow:inset 2px 0 0 var(--gold), 0 0 0 8px rgba(255,215,0,0);}
 }
 .topic-num{
   font-family:var(--serif);
@@ -410,7 +417,7 @@ button{font-family:inherit;}
 .lang-chip:hover{border-color:var(--hairline-strong);}
 .lang-chip.active{
   border-color:var(--gold);
-  background:linear-gradient(135deg, rgba(109,40,217,0.18), rgba(212,175,106,0.10));
+  background:linear-gradient(135deg, rgba(244,197,66,0.14), rgba(244,197,66,0.1));
   color:var(--gold-soft);
 }
 
@@ -462,13 +469,13 @@ button{font-family:inherit;}
   font-family:var(--sans);
   font-size:14px;
   font-weight:600;
-  color:#12102a;
-  background:linear-gradient(120deg, var(--gold), var(--violet-soft));
+  color:#000;
+  background:var(--accent-gradient);
   cursor:pointer;
   transition:transform .15s ease, box-shadow .15s ease;
-  box-shadow:0 8px 24px rgba(167,139,250,0.25);
+  box-shadow:0 8px 24px rgba(255,215,0,0.21);
 }
-.paywall-btn:hover{transform:translateY(-1px); box-shadow:0 10px 30px rgba(167,139,250,0.35);}
+.paywall-btn:hover{transform:translateY(-1px); box-shadow:0 10px 30px rgba(255,215,0,0.3);}
 .paywall-btn:disabled{opacity:0.6; cursor:default; transform:none;}
 .paywall-fineprint{
   margin-top:18px !important;
@@ -552,15 +559,15 @@ button{font-family:inherit;}
   transition:transform .2s ease;
 }
 .progress-dot.done{background:var(--gold); border-color:var(--gold); color:#241708; font-weight:600; animation:dotDone .35s ease;}
-.progress-dot.current{border-color:var(--violet-soft); color:var(--violet-soft); animation:dotPulse 1.8s ease-in-out infinite;}
+.progress-dot.current{border-color:var(--gold); color:var(--gold); animation:dotPulse 1.8s ease-in-out infinite;}
 @keyframes dotDone{
   0%{transform:scale(1);}
   40%{transform:scale(1.35);}
   100%{transform:scale(1);}
 }
 @keyframes dotPulse{
-  0%,100%{box-shadow:0 0 0 0 rgba(167,139,250,0.45);}
-  50%{box-shadow:0 0 0 5px rgba(167,139,250,0);}
+  0%,100%{box-shadow:0 0 0 0 rgba(255,215,0,0.38);}
+  50%{box-shadow:0 0 0 5px rgba(255,215,0,0);}
 }
 
 /* spread */
@@ -609,23 +616,23 @@ button{font-family:inherit;}
 }
 .tarot-card .face.back{
   background:
-    radial-gradient(circle at 50% 40%, rgba(167,139,250,0.20), transparent 58%),
-    repeating-linear-gradient(135deg, rgba(201,162,77,0.09) 0 2px, transparent 2px 14px),
-    linear-gradient(160deg, #211c42, #12102a);
+    radial-gradient(circle at 50% 40%, rgba(255,215,0,0.17), transparent 58%),
+    repeating-linear-gradient(135deg, rgba(244,197,66,0.09) 0 2px, transparent 2px 14px),
+    linear-gradient(160deg, #241c14, #0f0d0b);
   box-shadow:
-    inset 0 0 0 1px rgba(201,162,77,0.22),
-    inset 0 0 14px rgba(109,40,217,0.20);
+    inset 0 0 0 1px rgba(244,197,66,0.22),
+    inset 0 0 14px rgba(244,197,66,0.15);
 }
 .tarot-card .face.back svg.cardback-art{
   width:78%; height:78%;
-  filter:drop-shadow(0 0 6px rgba(167,139,250,0.45));
+  filter:drop-shadow(0 0 6px rgba(255,215,0,0.38));
 }
-.cardback-border{fill:none; stroke:rgba(201,162,77,0.4); stroke-width:0.6;}
-.cardback-inner{fill:none; stroke:rgba(201,162,77,0.22); stroke-width:0.5;}
-.cardback-moon{fill:#e3c98a; opacity:0.92;}
-.cardback-moon-shadow{fill:#12102a;}
+.cardback-border{fill:none; stroke:rgba(244,197,66,0.4); stroke-width:0.6;}
+.cardback-inner{fill:none; stroke:rgba(244,197,66,0.22); stroke-width:0.5;}
+.cardback-moon{fill:#ffe4a8; opacity:0.92;}
+.cardback-moon-shadow{fill:#0f0d0b;}
 .cardback-star{fill:var(--moonlight-soft);}
-.cardback-glyph{fill:none; stroke:rgba(201,162,77,0.5); stroke-width:0.8;}
+.cardback-glyph{fill:none; stroke:rgba(244,197,66,0.5); stroke-width:0.8;}
 .tarot-card .face.front{
   background:linear-gradient(180deg, var(--bg-panel-raised), var(--bg-panel));
   transform:rotateY(180deg);
@@ -653,9 +660,9 @@ button{font-family:inherit;}
   animation:flipGlow .8s ease;
 }
 @keyframes flipGlow{
-  0%{filter:drop-shadow(0 0 0 rgba(212,175,106,0)) drop-shadow(0 0 0 rgba(109,40,217,0));}
-  40%{filter:drop-shadow(0 0 10px rgba(212,175,106,0.5)) drop-shadow(0 0 16px rgba(109,40,217,0.45));}
-  100%{filter:drop-shadow(0 0 0 rgba(212,175,106,0)) drop-shadow(0 0 0 rgba(109,40,217,0));}
+  0%{filter:drop-shadow(0 0 0 rgba(244,197,66,0)) drop-shadow(0 0 0 rgba(244,197,66,0));}
+  40%{filter:drop-shadow(0 0 10px rgba(244,197,66,0.5)) drop-shadow(0 0 16px rgba(244,197,66,0.34));}
+  100%{filter:drop-shadow(0 0 0 rgba(244,197,66,0)) drop-shadow(0 0 0 rgba(244,197,66,0));}
 }
 .tarot-card.flipped .face.back{transform:rotateY(-180deg);}
 .tarot-card.flipped .face.front{transform:rotateY(0deg);}
@@ -663,9 +670,9 @@ button{font-family:inherit;}
 .tarot-card:not(.flipped):hover .face.back{
   transform:translateY(-6px) scale(1.05);
   box-shadow:
-    inset 0 0 0 1px rgba(212,175,106,0.35),
-    inset 0 0 16px rgba(109,40,217,0.25),
-    0 10px 22px rgba(109,40,217,0.28);
+    inset 0 0 0 1px rgba(244,197,66,0.35),
+    inset 0 0 16px rgba(244,197,66,0.19),
+    0 10px 22px rgba(244,197,66,0.21);
 }
 .tarot-card.picked-elsewhere{opacity:0.22; pointer-events:none;}
 .tarot-card:disabled{cursor:default;}
@@ -682,11 +689,11 @@ button{font-family:inherit;}
   100%{opacity:0; transform:translate(-50%,-50%) rotate(var(--ang)) translateX(var(--dist,50px)) scale(.2);}
 }
 .tarot-card .spark:nth-child(1){--ang:15deg; background:var(--gold-soft); animation-delay:.04s;}
-.tarot-card .spark:nth-child(2){--ang:75deg; background:var(--violet-soft); animation-delay:.1s;}
+.tarot-card .spark:nth-child(2){--ang:75deg; background:var(--gold); animation-delay:.1s;}
 .tarot-card .spark:nth-child(3){--ang:135deg; background:var(--gold-soft); animation-delay:0s;}
-.tarot-card .spark:nth-child(4){--ang:195deg; background:var(--violet-soft); animation-delay:.08s;}
+.tarot-card .spark:nth-child(4){--ang:195deg; background:var(--gold); animation-delay:.08s;}
 .tarot-card .spark:nth-child(5){--ang:255deg; background:var(--gold-soft); animation-delay:.02s;}
-.tarot-card .spark:nth-child(6){--ang:315deg; background:var(--violet-soft); animation-delay:.12s;}
+.tarot-card .spark:nth-child(6){--ang:315deg; background:var(--gold); animation-delay:.12s;}
 
 .spread-hint{
   color:var(--text-faint); font-size:12.5px; margin:14px 0 30px;
@@ -736,15 +743,15 @@ button{font-family:inherit;}
   overflow:visible;
   background:linear-gradient(180deg, var(--bg-panel-raised), var(--bg-panel));
   box-shadow:
-    0 0 0 1px rgba(212,175,106,0.35),
-    0 0 0 5px rgba(109,40,217,0.08),
+    0 0 0 1px rgba(244,197,66,0.35),
+    0 0 0 5px rgba(244,197,66,0.06),
     0 14px 30px rgba(0,0,0,0.4),
-    0 0 22px rgba(109,40,217,0.25);
+    0 0 22px rgba(244,197,66,0.19);
   animation:frameGlow 4s ease-in-out infinite;
 }
 @keyframes frameGlow{
-  0%,100%{box-shadow:0 0 0 1px rgba(212,175,106,0.35), 0 0 0 5px rgba(109,40,217,0.08), 0 14px 30px rgba(0,0,0,0.4), 0 0 22px rgba(109,40,217,0.22);}
-  50%{box-shadow:0 0 0 1px rgba(212,175,106,0.5), 0 0 0 5px rgba(109,40,217,0.14), 0 14px 30px rgba(0,0,0,0.4), 0 0 30px rgba(109,40,217,0.35);}
+  0%,100%{box-shadow:0 0 0 1px rgba(244,197,66,0.35), 0 0 0 5px rgba(244,197,66,0.06), 0 14px 30px rgba(0,0,0,0.4), 0 0 22px rgba(244,197,66,0.17);}
+  50%{box-shadow:0 0 0 1px rgba(244,197,66,0.5), 0 0 0 5px rgba(244,197,66,0.11), 0 14px 30px rgba(0,0,0,0.4), 0 0 30px rgba(244,197,66,0.26);}
 }
 .reveal-frame img{
   width:100%; height:100%; object-fit:cover;
@@ -765,8 +772,8 @@ button{font-family:inherit;}
   border-radius:50%;
   display:flex; align-items:center; justify-content:center;
   font-size:15px;
-  background:linear-gradient(135deg, var(--violet-soft), var(--violet));
-  box-shadow:0 4px 12px rgba(109,40,217,0.5), 0 0 0 3px var(--bg-deep);
+  background:var(--accent-gradient);
+  box-shadow:0 4px 12px rgba(244,197,66,0.38), 0 0 0 3px var(--bg-deep);
   animation:badgePop .5s cubic-bezier(.3,1.6,.5,1) .3s both;
 }
 @keyframes badgePop{
@@ -779,7 +786,7 @@ button{font-family:inherit;}
   display:flex; align-items:baseline; gap:10px; margin-bottom:14px;
 }
 .reveal-card-name .card-label{
-  font-family:var(--serif); font-size:26px; color:var(--violet-soft); font-weight:500;
+  font-family:var(--serif); font-size:26px; color:var(--gold); font-weight:500;
 }
 .reveal-card-name .month-tag{
   font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-faint);
@@ -890,12 +897,12 @@ button{font-family:inherit;}
   border-radius:10px;
   border:2px solid transparent;
   background-clip:padding-box;
-  background-image:linear-gradient(180deg, var(--gold-soft), var(--violet-soft), var(--gold));
+  background-image:linear-gradient(180deg, var(--gold-soft), var(--accent-end), var(--gold));
   background-size:100% 220%;
   animation:scrollbarShimmer 5s ease-in-out infinite;
 }
 *::-webkit-scrollbar-thumb:hover{
-  background-image:linear-gradient(180deg, var(--gold), var(--violet-soft), var(--gold-soft));
+  background-image:linear-gradient(180deg, var(--gold), var(--accent-end), var(--gold-soft));
 }
 *::-webkit-scrollbar-corner{background:transparent;}
 
@@ -922,7 +929,7 @@ button{font-family:inherit;}
    Site chrome — Header & Footer, matched to thedivinetarotonline.com
    Scoped with a `site-` prefix and its own small token set (exact colors
    pulled from the live site's own footer source) so it never collides
-   with the reading app's own --gold/--violet tokens above.
+   with the reading app's own tokens above (now the same palette).
    ===================================================================== */
 :root{
   --site-header-h:80px;
@@ -1262,11 +1269,10 @@ button{font-family:inherit;}
    sidebar's own fixed-height column (see .main.chat-mode further down). */
 .main.chat-mode{padding:0;}
 /* Warm gold-on-near-black, matched to chat.thedivinetarotonline.com's own
-   reading background — deliberately distinct from the violet used
-   elsewhere on the site, same as that reference app does. */
+   reading background; the rest of the app now shares the same palette. */
 .main.chat-mode{
   background:
-    radial-gradient(ellipse 900px 520px at 50% -8%, rgba(230,178,60,0.15), transparent 62%),
+    radial-gradient(ellipse 900px 520px at 50% -8%, rgba(244,197,66,0.15), transparent 62%),
     radial-gradient(ellipse 800px 520px at 50% 108%, rgba(180,110,30,0.13), transparent 62%),
     linear-gradient(180deg, #0a0908, #0d0b09);
 }
@@ -1302,7 +1308,7 @@ button{font-family:inherit;}
 }
 .chat-bubble.ginni{
   background:linear-gradient(135deg, #17140f, #201b14);
-  border:1px solid rgba(230,178,60,0.16);
+  border:1px solid rgba(244,197,66,0.16);
   color:var(--text-primary);
   border-bottom-left-radius:4px;
 }
@@ -1310,7 +1316,7 @@ button{font-family:inherit;}
   max-width:100%;
   width:100%;
   background:linear-gradient(135deg, rgba(120,90,20,0.18), rgba(10,9,8,0.35));
-  border:1px solid rgba(230,178,60,0.22);
+  border:1px solid rgba(244,197,66,0.22);
 }
 .chat-bubble--reveal .month-entry{margin-bottom:0; padding-bottom:0; border-bottom:none;}
 .chat-ai-tag{
@@ -1321,19 +1327,19 @@ button{font-family:inherit;}
 .reveal-followup-row{
   display:flex; flex-wrap:wrap; gap:8px;
   margin-top:14px; padding-top:14px;
-  border-top:1px solid rgba(230,178,60,0.14);
+  border-top:1px solid rgba(244,197,66,0.14);
 }
 .reveal-followup-btn{
   font-size:12.5px;
   padding:7px 14px;
   border-radius:999px;
-  border:1px solid rgba(230,178,60,0.25);
-  background:rgba(230,178,60,0.06);
+  border:1px solid rgba(244,197,66,0.25);
+  background:rgba(244,197,66,0.06);
   color:var(--gold-soft);
   cursor:pointer;
   transition:background .15s ease, opacity .15s ease;
 }
-.reveal-followup-btn:hover:not(:disabled){background:rgba(230,178,60,0.14);}
+.reveal-followup-btn:hover:not(:disabled){background:rgba(244,197,66,0.14);}
 
 @media (max-width:520px){
   /* "Aur samjhaiye / Deeper meaning / Share this card" wrapped onto uneven
@@ -1371,8 +1377,8 @@ button{font-family:inherit;}
   padding:0 18px;
   border-radius:10px;
   border:none;
-  background:linear-gradient(120deg, var(--gold), var(--violet-soft));
-  color:#12102a;
+  background:var(--accent-gradient);
+  color:#000;
   font-weight:600;
   font-size:13px;
   cursor:pointer;
@@ -1383,7 +1389,7 @@ button{font-family:inherit;}
   bottom:0;
   z-index:15;
   border-top:1px solid var(--hairline);
-  background:rgba(10,8,21,0.85);
+  background:rgba(11,11,15,0.85);
   backdrop-filter:blur(10px);
   padding:10px 16px calc(14px + env(safe-area-inset-bottom, 0px));
 }
@@ -1422,15 +1428,15 @@ button{font-family:inherit;}
   font-size:12.5px;
   font-weight:600;
   line-height:1.3;
-  color:#12102a;
-  background:linear-gradient(120deg, var(--gold), var(--violet-soft));
-  box-shadow:0 6px 20px rgba(201,162,77,0.25);
+  color:#000;
+  background:var(--accent-gradient);
+  box-shadow:0 6px 20px rgba(244,197,66,0.25);
   cursor:pointer;
   transition:transform .15s ease, box-shadow .15s ease;
   max-width:100%;
   white-space:normal;
 }
-.chat-subscribe-btn:hover{transform:translateY(-1px); box-shadow:0 10px 28px rgba(167,139,250,0.35);}
+.chat-subscribe-btn:hover{transform:translateY(-1px); box-shadow:0 10px 28px rgba(255,215,0,0.3);}
 .chat-subscribe-btn:disabled{opacity:0.6; cursor:default; transform:none;}
 .chat-pay-error{
   flex-basis:100%;
@@ -1464,8 +1470,8 @@ button{font-family:inherit;}
   padding:0 22px;
   border-radius:999px;
   border:none;
-  background:linear-gradient(120deg, var(--gold), var(--violet-soft));
-  color:#12102a;
+  background:var(--accent-gradient);
+  color:#000;
   font-weight:600;
   font-size:13.5px;
   cursor:pointer;
@@ -1475,8 +1481,8 @@ button{font-family:inherit;}
 .chat-send-btn:disabled{opacity:0.4; cursor:default;}
 
 .chat-modal-backdrop{
-  position:fixed; inset:0; z-index:50;
-  background:rgba(5,4,12,0.72);
+  position:fixed; inset:0; z-index:70; /* above the sticky site header (50) and the draw overlay (60) */
+  background:rgba(11,11,15,0.72);
   backdrop-filter:blur(4px);
   display:flex; align-items:center; justify-content:center;
   padding:20px;
@@ -1553,9 +1559,9 @@ button{font-family:inherit;}
   position:fixed; inset:0; z-index:60;
   display:flex; flex-direction:column;
   background:
-    radial-gradient(ellipse 900px 600px at 50% -5%, rgba(230,178,60,0.18), transparent 60%),
+    radial-gradient(ellipse 900px 600px at 50% -5%, rgba(244,197,66,0.18), transparent 60%),
     radial-gradient(ellipse 800px 600px at 50% 105%, rgba(180,110,30,0.16), transparent 60%),
-    linear-gradient(180deg, #08070a, #0c0a08);
+    linear-gradient(180deg, #0b0b0f, #0c0a08);
   animation:fadeIn .25s ease both;
 }
 .draw-overlay-scrim{position:absolute; inset:0; background:rgba(0,0,0,0.32); pointer-events:none;}

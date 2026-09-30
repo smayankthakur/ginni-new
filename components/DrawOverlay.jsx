@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import TarotCard from "./TarotCard";
 
 const SHUFFLE_MS = 900;
@@ -39,10 +40,16 @@ export default function DrawOverlay({ open, lang, spread, flippingCard, onPick, 
   }, [open]);
 
   if (!open) return null;
+  // Rendered into <body> via a portal: an ancestor inside the chat layout
+  // creates its own stacking context, which used to leave this fixed
+  // overlay *underneath* the sticky site header (z-index 50) — the "Ek card
+  // chuniye" title was hidden behind the logo. Portalling out means the
+  // overlay's z-index competes at the root level, where it belongs.
+  if (typeof document === "undefined") return null;
 
   const status = flippingCard ? CHOSEN_TEXT[lang] : PICK_TEXT[lang]?.(spread.length) || PICK_TEXT.hinglish(spread.length);
 
-  return (
+  return createPortal(
     <div className="draw-overlay">
       <div className="draw-overlay-scrim" />
 
@@ -87,6 +94,7 @@ export default function DrawOverlay({ open, lang, spread, flippingCard, onPick, 
       </div>
 
       <div className="draw-overlay-footer">{phase === "spread" && !flippingCard ? FOOTER_HINT[lang] : "\u00A0"}</div>
-    </div>
+    </div>,
+    document.body
   );
 }

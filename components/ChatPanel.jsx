@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { DECK, TOPICS, cardSlug } from "@/lib/topics";
 import { shuffle } from "@/lib/parseReading";
 import { getGreeting, getClosing } from "@/lib/ginni";
@@ -457,7 +458,7 @@ export default function ChatPanel({
         onCancel={handleCancelDraw}
       />
 
-      {showPaywall && (
+      {showPaywall && typeof document !== "undefined" && createPortal(
         <div className="chat-modal-backdrop" onClick={() => setShowPaywall(false)}>
           <div className="chat-modal-panel" onClick={(e) => e.stopPropagation()}>
             <button className="chat-modal-close" onClick={() => setShowPaywall(false)} aria-label="Close">
@@ -471,7 +472,8 @@ export default function ChatPanel({
               }}
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
