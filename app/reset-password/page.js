@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
+import PasswordInput from "@/components/PasswordInput";
 
 // /reset-password?token=... — the page the emailed link opens. Checks the
 // token first so an expired link says so immediately, then takes the new
@@ -91,9 +92,8 @@ export default function ResetPasswordPage() {
               <form onSubmit={handleSubmit}>
                 <div className="field">
                   <label htmlFor="newPassword">New password</label>
-                  <input
+                  <PasswordInput
                     id="newPassword"
-                    type="password"
                     required
                     minLength={8}
                     value={password}
@@ -104,9 +104,8 @@ export default function ResetPasswordPage() {
                 </div>
                 <div className="field">
                   <label htmlFor="confirmPassword">Confirm new password</label>
-                  <input
+                  <PasswordInput
                     id="confirmPassword"
-                    type="password"
                     required
                     minLength={8}
                     value={confirm}

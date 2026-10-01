@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import PasswordInput from "./PasswordInput";
 
 export default function AuthGate({ onAuthed }) {
   const [mode, setMode] = useState("login"); // "login" | "signup" | "forgot"
@@ -99,9 +100,8 @@ export default function AuthGate({ onAuthed }) {
           {mode !== "forgot" && (
           <div className="field">
             <label htmlFor="authPassword">Password</label>
-            <input
+            <PasswordInput
               id="authPassword"
-              type="password"
               required
               minLength={8}
               value={password}

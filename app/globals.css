@@ -178,6 +178,40 @@ button{font-family:inherit;}
 }
 .field input::placeholder{color:var(--text-faint);}
 
+/* Password box with show/hide eye (components/PasswordInput.jsx). The
+   input keeps the exact look of the other fields; the toggle sits inside
+   the right edge, so the extra right padding stops text running under it. */
+.password-wrap{position:relative;}
+.field .password-input{
+  width:100%;
+  background:rgba(0,0,0,0.2);
+  border:1px solid var(--hairline);
+  border-radius:10px;
+  padding:13px 48px 13px 14px;
+  color:var(--text-primary);
+  font-size:15px;
+  font-family:var(--sans);
+  outline:none;
+  transition:border-color .2s ease, background .2s ease;
+}
+.field .password-input:focus{
+  border-color:var(--hairline-strong);
+  background:rgba(0,0,0,0.3);
+}
+.password-toggle{
+  position:absolute; top:50%; right:6px;
+  transform:translateY(-50%);
+  width:38px; height:38px;
+  display:flex; align-items:center; justify-content:center;
+  border:none; border-radius:8px; background:none;
+  color:var(--text-muted);
+  cursor:pointer;
+  transition:color .15s ease, background .15s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+.password-toggle:hover{color:var(--text-primary); background:rgba(255,255,255,0.06);}
+.password-toggle[aria-pressed="true"]{color:var(--gold-soft);}
+
 .lang-options{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
 .lang-opt{
   border:1px solid var(--hairline);
