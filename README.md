@@ -186,6 +186,38 @@ it):
   verification, or IP/device-based rate limiting on `/api/auth/signup`.
 
 
+## Forgot password / reset
+
+"Forgot your password?" on the login screen emails a one-time reset link.
+
+- `POST /api/auth/forgot-password` `{ email }` — always answers with the same
+  message whether or not the address has an account (no email enumeration).
+  If it does, a 32-byte random token is generated, only its SHA-256 hash is
+  stored (`PasswordResetToken` table, 30-minute expiry, max 3 per account per
+  hour), and the raw token goes out in the link
+  `https://<this deployment>/reset-password?token=…`.
+- `GET /api/auth/reset-password?token=…` — `{ valid }`, so the page can say
+  "expired" up front. `POST` `{ token, password }` sets the new password,
+  burns that token and every other outstanding one for the account, and logs
+  the person in.
+- `app/reset-password/page.js` — the page the link opens.
+
+**Email sending** uses Resend's HTTP API (`lib/email.js`, no SDK). Env vars:
+
+- `RESEND_API_KEY` — required. Without it the forgot-password form shows
+  "reset emails aren't set up yet" instead of silently doing nothing.
+- `EMAIL_FROM` — e.g. `Ginni Ki Baatein <ginni@thedivinetarotonline.com>`.
+  The domain must be verified in Resend (Domains → add
+  thedivinetarotonline.com → add the DNS records it gives you). Until then
+  the default `onboarding@resend.dev` sender only delivers to the Resend
+  account's own email address.
+- `APP_URL` — optional; the link normally uses the request's own origin.
+
+**New migration required** — run
+`prisma/migrations/20261001090000_add_password_reset/migration.sql` once in
+Supabase's SQL Editor (or `npx prisma migrate deploy`) before the feature
+goes live; without the table the forgot-password request fails with a 500.
+
 ## Structure
 
 - `app/page.js` — top-level screen switcher (auth → onboarding → app)

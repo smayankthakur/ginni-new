@@ -39,3 +39,6 @@ next-env.d.ts
 
 # local archives / zips
 *.zip
+
+# local notes that contain real credentials — never commit
+env.var.html

@@ -3,7 +3,8 @@
 import { useState } from "react";
 
 export default function AuthGate({ onAuthed }) {
-  const [mode, setMode] = useState("login"); // "login" | "signup"
+  const [mode, setMode] = useState("login"); // "login" | "signup" | "forgot"
+  const [sent, setSent] = useState(null); // confirmation text after a reset email is requested
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -15,6 +16,18 @@ export default function AuthGate({ onAuthed }) {
     setError(null);
     setLoading(true);
     try {
+      if (mode === "forgot") {
+        const res = await fetch("/api/auth/forgot-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Something went wrong.");
+        setSent(data.message);
+        return;
+      }
+
       // A referral link looks like yoursite.com/?ref=CODE — an unrecognized
       // or absent code is never an error, the server just signs them up
       // without crediting anyone (see app/api/auth/signup/route.js).
@@ -45,9 +58,16 @@ export default function AuthGate({ onAuthed }) {
         <img src="/logo.png" alt="The Divine Tarot" className="onboard-glyph" />
         <h1>Ginni Ki Baatein</h1>
         <p className="onboard-sub">
-          {mode === "login" ? "Log in to continue your readings." : "Create an account to get 3 free readings."}
+          {mode === "login"
+            ? "Log in to continue your readings."
+            : mode === "signup"
+              ? "Create an account to get 3 free readings."
+              : "Enter your email and we'll send you a link to set a new password."}
         </p>
 
+        {sent ? (
+          <p className="prompt auth-sent" role="status">{sent}</p>
+        ) : (
         <form onSubmit={handleSubmit}>
           <div className="field">
             <label htmlFor="authEmail">Email</label>
@@ -76,6 +96,7 @@ export default function AuthGate({ onAuthed }) {
             </div>
           )}
 
+          {mode !== "forgot" && (
           <div className="field">
             <label htmlFor="authPassword">Password</label>
             <input
@@ -89,6 +110,7 @@ export default function AuthGate({ onAuthed }) {
               placeholder="At least 8 characters"
             />
           </div>
+          )}
 
           {error && (
             <p className="prompt" style={{ color: "var(--rose)", marginTop: -8, marginBottom: 16 }}>
@@ -97,9 +119,29 @@ export default function AuthGate({ onAuthed }) {
           )}
 
           <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? "Please wait…" : mode === "login" ? "Log in" : "Create account"}
+            {loading
+              ? "Please wait…"
+              : mode === "login"
+                ? "Log in"
+                : mode === "signup"
+                  ? "Create account"
+                  : "Send reset link"}
           </button>
         </form>
+        )}
+
+        {mode === "login" && (
+          <button
+            type="button"
+            className="auth-switch auth-forgot"
+            onClick={() => {
+              setMode("forgot");
+              setError(null);
+            }}
+          >
+            Forgot your password?
+          </button>
+        )}
 
         <button
           type="button"
@@ -107,9 +149,14 @@ export default function AuthGate({ onAuthed }) {
           onClick={() => {
             setMode((m) => (m === "login" ? "signup" : "login"));
             setError(null);
+            setSent(null);
           }}
         >
-          {mode === "login" ? "New here? Create an account" : "Already have an account? Log in"}
+          {mode === "login"
+            ? "New here? Create an account"
+            : mode === "signup"
+              ? "Already have an account? Log in"
+              : "Back to log in"}
         </button>
       </div>
     </div>

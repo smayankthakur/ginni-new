@@ -27,6 +27,7 @@ model User {
   createdAt           DateTime      @default(now())
   orders              Order[]
   chatMessages        ChatMessage[]
+  passwordResets      PasswordResetToken[]
 
   // Referrals — see REFERRAL_BONUS_READINGS in lib/auth.js and the reward
   // logic in app/api/verify-payment/route.js. referralCode is this user's
@@ -88,4 +89,22 @@ model NewsletterSubscriber {
   phone     String?
   source    String   @default("footer")
   createdAt DateTime @default(now())
+}
+
+// "Forgot password" links. Only a SHA-256 hash of the token is stored —
+// the raw token exists solely inside the emailed link — so a leaked
+// database row can't be used to reset anyone's password. Rows expire
+// after 30 minutes and are marked used on first successful reset; any
+// other outstanding rows for the same user are invalidated at that moment
+// (app/api/auth/reset-password/route.js).
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
 }
