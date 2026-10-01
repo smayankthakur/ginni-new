@@ -218,6 +218,18 @@ it):
 Supabase's SQL Editor (or `npx prisma migrate deploy`) before the feature
 goes live; without the table the forgot-password request fails with a 500.
 
+## Deploying from the shared repo (devthedivinetarot/ginni-new)
+
+The client's Vercel project is on a Hobby account, which blocks Git
+deployments whose commit author isn't the account owner — every commit from
+an outside developer shows as **Blocked**. So deployments there go through a
+Vercel **Deploy Hook** instead, triggered by `.github/workflows/deploy-vercel.yml`
+on every push to `main` (hooks are exempt from the author check), and
+`vercel.json` switches the automatic Git deployments for `main` off so the
+dashboard doesn't fill with blocked rows. One-time setup: create the hook in
+the Vercel project (Settings → Git → Deploy Hooks, branch `main`) and store its
+URL as the GitHub Actions secret `VERCEL_DEPLOY_HOOK_URL` on the repo.
+
 ## Structure
 
 - `app/page.js` — top-level screen switcher (auth → onboarding → app)

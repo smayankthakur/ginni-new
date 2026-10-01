@@ -1,0 +1,36 @@
+# Deploys the shared repo's `main` branch to the client's Vercel project.
+#
+# Why not Vercel's normal Git integration? On a Hobby account Vercel blocks
+# any deployment whose commit author isn't the account owner ("Git author
+# must have access to the project"), so commits from outside developers
+# show up as "Blocked". Deploy Hooks are exempt from that check, so this
+# workflow simply pings the project's hook after every push to `main`.
+# vercel.json turns the automatic Git deployments for `main` off so the
+# dashboard doesn't fill with blocked rows next to the real builds.
+#
+# Setup (once, by whoever owns the Vercel project):
+#   1. Vercel project -> Settings -> Git -> Deploy Hooks -> Create Hook
+#      (name: "github-main", branch: main). Copy the URL.
+#   2. GitHub repo -> Settings -> Secrets and variables -> Actions ->
+#      New repository secret: VERCEL_DEPLOY_HOOK_URL = that URL.
+name: Deploy to Vercel
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel deploy hook
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::error::VERCEL_DEPLOY_HOOK_URL secret is not set (see comments in this workflow)."
+            exit 1
+          fi
+          curl --fail --silent --show-error -X POST "$HOOK"
+          echo "Deploy hook triggered."
