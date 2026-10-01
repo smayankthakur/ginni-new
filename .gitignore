@@ -42,3 +42,6 @@ next-env.d.ts
 
 # local notes that contain real credentials — never commit
 env.var.html
+
+# screenshots the Claude desktop app drops into the project folder
+Claude outputs/
